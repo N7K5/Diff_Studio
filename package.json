@@ -1,0 +1,224 @@
+{
+  "name": "diff-studio",
+  "displayName": "Diff Studio",
+  "description": "Editable local, SSH and Git comparisons with a visual agent bridge.",
+  "version": "0.5.0",
+  "type": "module",
+  "publisher": "local-tools",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.100.0"
+  },
+  "categories": [
+    "Other",
+    "SCM Providers"
+  ],
+  "main": "./dist/extension.cjs",
+  "extensionKind": [
+    "workspace"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": false
+    }
+  },
+  "contributes": {
+    "commands": [
+      {
+        "command": "diffStudio.open",
+        "title": "Diff Studio: Open Comparison Studio"
+      },
+      {
+        "command": "diffStudio.compareSelected",
+        "title": "Diff Studio: Compare Selected Files"
+      },
+      {
+        "command": "diffStudio.gitWorking",
+        "title": "Diff Studio: Compare Current File with Git Revision"
+      },
+      {
+        "command": "diffStudio.gitBase",
+        "title": "Diff Studio: Changes Against Base Branch"
+      },
+      {
+        "command": "diffStudio.startAgent",
+        "title": "Diff Studio: Start Agent Bridge"
+      },
+      {
+        "command": "diffStudio.stopAgent",
+        "title": "Diff Studio: Stop Agent Bridge"
+      },
+      {
+        "command": "diffStudio.saveSession",
+        "title": "Diff Studio: Save Session"
+      },
+      {
+        "command": "diffStudio.openSession",
+        "title": "Diff Studio: Open Saved Session"
+      },
+      {
+        "command": "diffStudio.copyAgentInstructions",
+        "title": "Diff Studio: Copy Agent Instructions"
+      }
+    ],
+    "menus": {
+      "explorer/context": [
+        {
+          "command": "diffStudio.compareSelected",
+          "group": "navigation",
+          "when": "!explorerResourceIsFolder"
+        },
+        {
+          "command": "diffStudio.openSession",
+          "group": "navigation",
+          "when": "resourceExtname == .diff_studio"
+        }
+      ],
+      "editor/title": [
+        {
+          "command": "diffStudio.gitWorking",
+          "group": "navigation",
+          "when": "resourceScheme == file"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Diff Studio",
+      "properties": {
+        "diffStudio.layout": {
+          "type": "string",
+          "enum": [
+            "sideBySide",
+            "inline"
+          ],
+          "default": "sideBySide",
+          "description": "Default comparison layout."
+        },
+        "diffStudio.ignoreWhitespace": {
+          "type": "boolean",
+          "default": false,
+          "description": "Ignore leading and trailing whitespace in comparisons."
+        },
+        "diffStudio.wordWrap": {
+          "type": "boolean",
+          "default": false,
+          "description": "Wrap long lines."
+        },
+        "diffStudio.hideUnchanged": {
+          "type": "boolean",
+          "default": false,
+          "description": "Fold unchanged lines."
+        },
+        "diffStudio.fontSize": {
+          "type": "number",
+          "default": 13,
+          "minimum": 10,
+          "maximum": 28,
+          "description": "Editor font size."
+        },
+        "diffStudio.baseBranch": {
+          "type": "string",
+          "default": "",
+          "description": "Base branch; empty auto-detects origin/HEAD, master or main."
+        },
+        "diffStudio.maxFileMB": {
+          "type": "number",
+          "default": 10,
+          "minimum": 1,
+          "maximum": 100,
+          "description": "Maximum text file size in MB."
+        },
+        "diffStudio.sshTimeoutSeconds": {
+          "type": "number",
+          "default": 20,
+          "minimum": 5,
+          "maximum": 120,
+          "description": "SSH command timeout. Uses your existing OpenSSH configuration and keys."
+        },
+        "diffStudio.sidebarAutoHide": {
+          "type": "boolean",
+          "default": false,
+          "description": "Collapse the comparison file list and reveal it on hover or keyboard focus."
+        },
+        "diffStudio.showTopBar": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show comparison setup controls. Successful Open comparison collapses them; Choose files / revisions restores them."
+        },
+        "diffStudio.showBottomBar": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show the activity panel and editor footer. Restore them with the Bottom bar button."
+        },
+        "diffStudio.comparisonHistoryLimit": {
+          "type": "integer",
+          "default": 10,
+          "minimum": 0,
+          "maximum": 100,
+          "description": "Number of recent comparisons to remember per workspace. Set to 0 to disable history. Unsaved buffers remain accessible."
+        },
+        "diffStudio.remoteHistoryLimit": {
+          "type": "integer",
+          "default": 5,
+          "minimum": 0,
+          "maximum": 100,
+          "description": "Number of recently connected SSH VMs to remember. Set to 0 to disable connection history."
+        },
+        "diffStudio.sidebarWidth": {
+          "type": "integer",
+          "default": 260,
+          "minimum": 160,
+          "maximum": 800,
+          "description": "Preferred comparison sidebar width in pixels. Drag its right edge to resize; narrow windows limit the visible width."
+        }
+      }
+    },
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "diffStudio",
+          "title": "Diff Studio",
+          "icon": "assets/diff-studio.svg"
+        }
+      ]
+    },
+    "views": {
+      "diffStudio": [
+        {
+          "id": "diffStudio.navigation",
+          "name": "Diff Studio"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "typecheck": "tsc --noEmit",
+    "test": "npm run typecheck && npm run build && node --import tsx --test test/*.test.ts",
+    "test:ui": "node scripts/test-ui.mjs",
+    "test:vscode": "node scripts/test-vscode.mjs",
+    "test:remote": "node --import tsx scripts/test-remote.ts",
+    "package": "npm run build && vsce package --no-dependencies --allow-missing-repository --out artifacts/diff-studio.vsix",
+    "vscode:prepublish": "npm run build",
+    "agent": "node scripts/agent.mjs",
+    "fixtures": "node --import tsx scripts/fixtures.ts"
+  },
+  "overrides": {
+    "dompurify": "3.4.16"
+  },
+  "dependencies": {
+    "monaco-editor": "^0.57.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/vscode": "^1.100.0",
+    "@vscode/vsce": "^3.6.0",
+    "esbuild": "^0.25.0",
+    "playwright": "^1.55.0",
+    "tsx": "^4.20.0",
+    "typescript": "^5.9.0"
+  }
+}

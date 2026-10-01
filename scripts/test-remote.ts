@@ -1,0 +1,30 @@
+import {Studio} from '../src/studio';
+import {Transport,hash,joinLocation} from '../src/transport';
+import {promises as fs} from 'node:fs';
+import path from 'node:path';
+import assert from 'node:assert/strict';
+const host=process.env.DIFF_STUDIO_SSH_HOST||'phoenix773679.private1.oaceng02phx.oraclevcn.com';
+const io=new Transport(10*1048576,45000);const studio=new Studio(io);
+const remoteRoot=`/tmp/diff-studio-test-${Date.now()}`;const remote=`ssh://${host}${remoteRoot}`;
+const local=path.resolve('.test-data',`remote-${Date.now()}`);await fs.mkdir(local,{recursive:true});
+const checks:string[]=[];
+try{
+ const home=await io.browse(`ssh://${host}/`,true);assert.ok(home.home.startsWith('/'));assert.ok(Array.isArray(home.entries));checks.push('SSH connection probe and remote home directory browser');
+ await io.run(`ssh://${host}/tmp`,['mkdir','-p',remoteRoot]);
+ const left=joinLocation(remote,"left ' file.ts"),right=joinLocation(remote,'right.ts');
+ await io.write(left,Buffer.from('export const value = 1;\n'),'missing');await io.write(right,Buffer.from('export const value = 2;\n'),'missing');
+ const listing=await io.browse(remote);assert.ok(listing.entries.some(e=>e.name==="left ' file.ts"&&!e.directory));assert.equal((await io.browse(left)).path,remoteRoot);checks.push('Remote folder browser lists quoted filenames and navigates from a selected file');
+ const localFile=path.join(local,'local.ts');await fs.writeFile(localFile,'export const value = 0;\n');
+ const mixed=await studio.open({left:{kind:'file',uri:localFile},right:{kind:'file',uri:left}});assert.match(mixed.right.text,/value = 1/);checks.push('local ↔ remote read, syntax detection');
+ studio.edit(mixed.id,'right','export const value = 3;\n');await studio.save(mixed.id,'right');assert.equal((await io.read(left))!.toString(),'export const value = 3;\n');checks.push('remote editable pane saved and read back over SSH');
+ const both=await studio.open({left:{kind:'file',uri:left},right:{kind:'file',uri:right}});studio.edit(both.id,'left','export const value = 4;\n');await studio.save(both.id,'left');studio.edit(both.id,'right','export const value = 5;\n');await studio.save(both.id,'right');assert.match((await io.read(left))!.toString(),/value = 4/);assert.match((await io.read(right))!.toString(),/value = 5/);checks.push('remote ↔ remote; both panes writable');
+ await io.write(right,Buffer.from('external\n'),hash('export const value = 5;\n'));studio.edit(both.id,'right','mine\n');await assert.rejects(studio.save(both.id,'right'),/changed on disk/);checks.push('remote conflict protection');
+ const entries=await studio.directories(local,remote);assert.ok(entries.length>=3);checks.push('local ↔ remote directory comparison');
+ await io.run(remote,['git','init','-b','master']);await io.run(remote,['git','-c','user.name=Diff Studio Test','-c','user.email=diff@example.invalid','add','.']);await io.run(remote,['git','-c','user.name=Diff Studio Test','-c','user.email=diff@example.invalid','commit','-m','Test snapshot']);
+ await io.write(left,Buffer.from('export const value = 6;\n'),hash('export const value = 4;\n'));
+ const git=await studio.open({left:{kind:'git',repo:remote,path:"left ' file.ts",ref:'HEAD'},right:{kind:'file',uri:left}});assert.match(git.left.text,/value = 4/);assert.match(git.right.text,/value = 6/);checks.push('remote Git revision ↔ remote working file');
+ assert.equal((await studio.git.changes(remote,'master')).entries.length,1);checks.push('remote Git branch changes');
+ const folder=await studio.git.selection(remote,remote,'HEAD');assert.equal(folder.entries?.length,1);checks.push('remote repository URI opens folder-level changes');
+ const selected=await studio.git.selection(remote,left,'HEAD');assert.equal(selected.path,"left ' file.ts");assert.equal(selected.request?.right.kind,'file');assert.ok((await studio.git.paths(remote)).includes("left ' file.ts"));checks.push('absolute SSH Git file selection and remote picker listing');
+ const report={passed:true,host,remoteRoot,checks,date:new Date().toISOString()};await fs.mkdir('artifacts',{recursive:true});await fs.writeFile(process.env.DIFF_STUDIO_REMOTE_REPORT||'artifacts/remote-test.json',JSON.stringify(report,null,2));console.log(JSON.stringify(report,null,2));
+}finally{await io.run(`ssh://${host}/tmp`,['rm','-rf','--',remoteRoot]).catch(e=>console.error('Fixture cleanup failed:',e.message));}

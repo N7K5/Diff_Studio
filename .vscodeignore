@@ -1,0 +1,14 @@
+src/**
+webview/**
+test/**
+scripts/build.mjs
+scripts/fixtures.ts
+scripts/test-*
+node_modules/**
+.test-*/**
+.vscode/**
+artifacts/**
+dist/vscode-tests.cjs
+tsconfig.json
+package-lock.json
+**/*.map
