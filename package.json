@@ -2,7 +2,7 @@
   "name": "diff-studio",
   "displayName": "Diff Studio",
   "description": "Built for coding agents: review project diffs, edit side by side, discuss changes with line comments, and share portable review sessions.",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "type": "module",
   "publisher": "N7K5",
   "icon": "assets/marketplace-logo.png",

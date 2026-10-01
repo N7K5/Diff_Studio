@@ -4,6 +4,7 @@ import {promises as fs} from 'node:fs';
 import path from 'node:path';
 import {build} from 'esbuild';
 import {chromium} from 'playwright';
+import {captureWalkthrough} from './test-marketplace-animation.mjs';
 const root=process.cwd(),dir=path.join(root,'.test-marketplace');
 await fs.mkdir(path.join(dir,'user','User'),{recursive:true});
 await fs.mkdir('assets/screenshots',{recursive:true});
@@ -24,6 +25,10 @@ try{
  const frame=await until(async()=>{for(const f of page.frames())if(await f.locator('#comparison').count())return f;});
  await frame.locator('#comparison').waitFor({state:'visible'});
  await until(async()=>(await frame.locator('#stats').textContent()).includes('change'));
+ if(process.env.DIFF_STUDIO_CAPTURE_GIF){
+  await captureWalkthrough(page,frame,ready);
+  if(errors.length)throw new Error(errors.join('\n'));
+ }else{
  const action=type=>fs.writeFile(path.join(dir,'action.json'),JSON.stringify({type}));
  const capture=async(name)=>{await page.setViewportSize({width:1680,height:name==='git-revisions'?1100:900});await frame.locator('#title').click();await sleep(900);await frame.locator('body').screenshot({path:`assets/screenshots/${name}.png`});console.log('Captured '+name);};
  await frame.locator('#file-set').selectOption({label:'Agent files (7)'});
@@ -47,6 +52,7 @@ try{
  await frame.locator('#focus-editor .comment-reply').waitFor();await capture('portable-session');
  if(errors.length)throw new Error(errors.join('\n'));
  await fs.writeFile('artifacts/marketplace-screenshots.json',JSON.stringify({passed:true,screenshots:['agent-project','review-comments','git-revisions','portable-session'],pageErrors:errors},null,2));
+ }
 }finally{
  await fs.writeFile(path.join(dir,'action.json'),JSON.stringify({type:'finish'}));await sleep(800);
  if(browser)await browser.close();child.kill();await log.close();

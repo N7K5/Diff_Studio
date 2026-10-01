@@ -23,6 +23,9 @@ export async function run(){
  await write('config/app.json','{\n  "retryCount": 3,\n  "showLoadingState": true\n}\n');
  git('rm','src/legacy-client.ts');git('add','.');git('commit','-m','Handle temporary failures and loading states');git('tag','v1.1');
  await write('docs/review-notes.md','# Catalog review\n\nReview retry limits and user-visible error messages.\n');
+ const before=path.join(demo,'before'),after=path.join(demo,'after');await fs.mkdir(before);
+ for(const file of git('ls-tree','-r','--name-only','main').split('\n')){await fs.mkdir(path.dirname(path.join(before,file)),{recursive:true});await fs.writeFile(path.join(before,file),git('show',`main:${file}`)+'\n');}
+ await fs.cp(repo,after,{recursive:true,filter:source=>path.basename(source)!=='.git'});
  const extension=vscode.extensions.getExtension('N7K5.diff-studio');if(!extension)throw new Error('Extension missing');
  const api=await extension.activate();await api.reveal();
  const descriptor=await api.startAgent();
@@ -35,7 +38,7 @@ export async function run(){
  await vscode.commands.executeCommand('workbench.action.closePanel');
  await vscode.commands.executeCommand('workbench.action.closeSidebar');
  await vscode.commands.executeCommand('workbench.action.closeAuxiliaryBar');
- await fs.writeFile(path.join(control,'ready.json'),JSON.stringify({repo,descriptor,sessionId}));
+ await fs.writeFile(path.join(control,'ready.json'),JSON.stringify({repo,before,after,descriptor,sessionId}));
  try{
   for(let i=0;i<1200;i++){
    const actionPath=path.join(control,'action.json');

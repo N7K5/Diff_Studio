@@ -20,6 +20,12 @@ Use it alongside Codex or another agent that can run local commands. It also wor
 - **Compare across machines.** Browse local or SSH sources independently, including two different remote machines.
 - **Take a review with you.** Save a `.diff_studio` session containing compared text, file trees, edits, and comment threads. Reopen it without the original repository.
 
+## See it in action
+
+![Animated walkthrough of opening a folder comparison, switching files, collapsing setup, and revealing the sidebar on hover](assets/screenshots/folder-walkthrough.gif)
+
+*Recorded in the real VS Code extension with sample files and a highlighted cursor: open two folders, browse their changes, show or hide comparison setup, then auto-hide, hover to reveal, and pin the file list.*
+
 ## Start a comparison
 
 1. Install **Diff Studio** and open the **Diff Studio icon** in VS Code's Activity Bar. You can also run **Diff Studio: Open Comparison Studio** from the command palette.

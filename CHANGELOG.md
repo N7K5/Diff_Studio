@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.2
+
+- Added an animated Marketplace walkthrough of folder comparison, file navigation, comparison setup visibility, and sidebar auto-hide, hover reveal, and pinning.
+
 ## 0.5.1
 
 - Reworked the Marketplace page around agent-assisted project reviews, with a step-by-step guide and practical prompts for Git, refactoring, SSH, folders, comments, and portable sessions.
