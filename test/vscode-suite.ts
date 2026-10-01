@@ -9,7 +9,7 @@ export async function run(){
  const root=path.resolve(__dirname,'..');const dir=path.join(root,'.test-vscode');await fs.mkdir(dir,{recursive:true});
  const fixtures=await createFixtures(path.join(root,'.test-data',`vscode-${Date.now()}`));
  process.env.PATH=(await sshFixture(fixtures.root))+path.delimiter+process.env.PATH;
- const extension=vscode.extensions.getExtension('local-tools.diff-studio');assert.ok(extension,'Extension is registered');const api=await extension.activate();assert.ok(api.studio);
+ const extension=vscode.extensions.getExtension('N7K5.diff-studio');assert.ok(extension,'Extension is registered');const api=await extension.activate();assert.ok(api.studio);
  const commands=await vscode.commands.getCommands();for(const c of ['open','compareSelected','gitWorking','gitBase','startAgent','stopAgent','copyAgentInstructions'])assert.ok(commands.includes('diffStudio.'+c));
  const session=await vscode.commands.executeCommand<any>('diffStudio.open',{left:{kind:'file',uri:path.join(fixtures.left,'sample.ts')},right:{kind:'file',uri:path.join(fixtures.right,'sample.ts')},title:'Editable local files'});
  assert.ok(session.left.writable&&session.right.writable);const descriptor=await vscode.commands.executeCommand<string>('diffStudio.startAgent');

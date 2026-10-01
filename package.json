@@ -1,10 +1,15 @@
 {
   "name": "diff-studio",
   "displayName": "Diff Studio",
-  "description": "Editable local, SSH and Git comparisons with a visual agent bridge.",
-  "version": "0.5.0",
+  "description": "Built for coding agents: review project diffs, edit side by side, discuss changes with line comments, and share portable review sessions.",
+  "version": "0.5.1",
   "type": "module",
-  "publisher": "local-tools",
+  "publisher": "N7K5",
+  "icon": "assets/marketplace-logo.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/N7K5/Diff_Studio.git"
+  },
   "license": "MIT",
   "engines": {
     "vscode": "^1.100.0"
@@ -220,5 +225,17 @@
     "playwright": "^1.55.0",
     "tsx": "^4.20.0",
     "typescript": "^5.9.0"
+  },
+  "keywords": [
+    "diff",
+    "agent",
+    "code review",
+    "git",
+    "ssh",
+    "comments",
+    "codex"
+  ],
+  "bugs": {
+    "url": "https://github.com/N7K5/Diff_Studio/issues"
   }
 }
