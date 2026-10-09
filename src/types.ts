@@ -19,3 +19,5 @@ export function languageFor(name: string): string {
 export interface CommentReply {id:string;body:string;author:'user'|'agent';createdAt:string}
 export interface LineComment {id:string;side:"left"|"right";line:number;body:string;anchor:string;outdated:boolean;createdAt:string;updatedAt:string;author?:'user'|'agent';resolved?:boolean;replies?:CommentReply[]}
 export interface ComparisonGroup {id:string;label:string;entries:ChangeEntry[]}
+export interface HighlightRange {id:string;sessionId:string;side:'left'|'right';startLine:number;endLine:number;label:string;color?:string;commentId?:string;outdated:boolean}
+export interface HighlightSet {id:string;label:string;color:string;ranges:HighlightRange[]}

@@ -1,5 +1,33 @@
 # Changelog
 
+## 1.2.0
+
+- Add named agent highlight groups spanning line ranges across files, with custom colors, inline discussion threads, and a separate Files section.
+- Add highlight creation, update, navigation and removal commands to the agent CLI and copied skill.
+- Preserve highlights in portable session archives, track line shifts, and flag ranges changed by edits.
+
+## 1.1.2
+
+- Put comparison setup first, color agent connection controls, and combine Agent ready with Copy instructions.
+- Add View session to Manage session, including revealing an auto-hidden sidebar.
+- Show full names and control descriptions after a half-second hover.
+
+## 1.1.1
+
+- Group Open session, Save session, Reset session and Link repository in a keyboard-accessible Manage session menu. Keep the session comparison count visible beside it.
+
+## 1.1.0
+
+- Add Reset session with save-first and cancel options. Clear comparisons, comments, history and editor state while keeping the agent connected.
+- Add agent `reset`, custom `changes` lists, and `--replace` to show a different review even when Follow agent is paused.
+- Refresh reused clean comparisons and retain dirty buffers and comment threads. Prevent earlier in-flight captures from reappearing after reset.
+
+## 1.0.0
+
+- Rename the extension to **Diff Studio Pro** with package ID `diff-studio-pro`.
+
+- Set the Marketplace publisher to `KUNU` and release version to `1.0.0`.
+
 ## 0.5.2
 
 - Added an animated Marketplace walkthrough of folder comparison, file navigation, comparison setup visibility, and sidebar auto-hide, hover reveal, and pinning.

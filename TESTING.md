@@ -1,5 +1,13 @@
 # Verification results
 
+## Version 1.2.0: agent line-range highlights
+
+All 57 integration tests and 31 focused installed VS Code UI checks pass, with no page errors. Coverage includes a ten-file Git review with ten highlighted lines across five files and twenty across two others; custom group/range colors; both sides and focused layouts; comment replies; atomic batch validation; updates/removal; line shifts and changed-range flags; reset protection; fresh CLI processes; and portable archive restoration with original files moved away. UI checks exercise the separate Agent highlights section and navigation without replacing the full file tree. The bundled skill validates. Evidence: `artifacts/v120-unit.log`, `artifacts/v120-installed-ui.json`, `artifacts/v120-highlights.png`, and `artifacts/v120-verification.json`. No new live SSH test is claimed.
+
+## Version 1.1.0: reset and repeated agent reviews
+
+All 51 integration tests and 70 installed VS Code UI checks pass, with no page errors. Reset coverage includes draft/comment protection, cancellation, saving an archive before clearing, disposal of editor/comment state, preserved disk files and agent connection, and fresh comparisons after reset. Replacement-list checks cover paused Follow agent, old filters, empty lists, custom batches, project/folder lists, retained comments/dirty buffers, and refreshing clean files. Concurrent capture/reset tests prevent stale comparisons from reappearing. Evidence: `artifacts/v110-unit.log`, `artifacts/v110-installed-ui.json`, and `artifacts/v110-verification.json`. No new live SSH test is claimed.
+
 ## Version 0.5.0: persistent agent file trees and review threads
 
 The integration suite has 47 passing tests. New coverage includes concurrent/deduplicated file opens, separate baselines for the same path, persistent accumulated trees, Git project/folder publication, preservation of dirty reviewed buffers, comment reads/replies/fixes/resolution, invalid reply validation and portable discussion archives. The installed desktop suite exercises 64 checks, including manual navigation during agent updates, the Follow agent control, File set selection, user/agent replies, resolving/reopening threads, Copy review request and saved-tree restoration. Evidence: `artifacts/v050-unit.log` and `artifacts/v050-package-ui.json`. The bundled skill validates and documents the new commands. No live SSH rerun is claimed.

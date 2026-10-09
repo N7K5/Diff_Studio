@@ -16,7 +16,13 @@ Every command uses `node CLI_PATH --bridge DESCRIPTOR_PATH COMMAND ...`, with pa
 | Command and arguments | Effect |
 | --- | --- |
 | `list` | Read all current comparisons and their full buffers. |
+| `highlights` | List named highlight groups, ranges, colors, comment IDs and changed-range flags. |
+| `highlight JSON_FILE [--reveal]` | Create or update a named group of line ranges across comparisons; see Highlight specific lines below. |
+| `highlight-reveal GROUP_ID [RANGE_ID]` | Explicitly navigate to the range, including while Follow agent is paused. |
+| `highlight-remove GROUP_ID` | Remove that group and its colors; keep the discussion threads. |
 | `groups` | List persistent file trees with session IDs and unavailable-file reasons. |
+| `reset [--discard]` | Clear comparisons, trees, comments and history while keeping the bridge connected. Refuses to discard edits, comments or highlights without `--discard`. |
+| `changes JSON_FILE [--replace]` | Publish a custom list: `{"label":"Review","comparisons":[{"path":"src/file.ts","left":SOURCE,"right":SOURCE}]}`. Use the source schema below. |
 | `project REPO [BASE=HEAD] [TARGET=WORKING]` | Publish the project's changed-file tree. Use branches, commits, or INDEX as revisions; WORKING makes current files editable. |
 | `folders LEFT RIGHT` | Publish all changed files from two local or SSH folders. |
 | `comments [SESSION]` | Read all review threads (or one session), including IDs, side, line, anchor, replies, outdated and resolved state. |
@@ -37,6 +43,10 @@ Every command uses `node CLI_PATH --bridge DESCRIPTOR_PATH COMMAND ...`, with pa
 
 ## Make changes visible
 
+When the user asks to see a **different review**, use `project REPO BASE TARGET --replace`, `folders LEFT RIGHT --replace`, or `changes JSON_FILE --replace`. This replaces Agent files and explicitly shows the new tree and first supported comparison even if Follow agent is paused. Previous comparisons, dirty buffers, and comments remain in Session; an empty replacement clears the editor and shows an empty file list. `--replace` also works with `open`, `git`, `revisions`, and `request` for a new single-file review. Do not use it on every background edit, since it intentionally changes the user's view. Without it, opening files continues to accumulate comparisons and respect paused navigation.
+
+Use `reset` only when the user requests a fresh session. It leaves disk files, saved `.diff_studio` archives, settings and the current bridge descriptor intact, and restores Follow agent. Old comparison IDs become invalid: run `list` and use IDs from newly opened comparisons. If reset reports edits or comments, ask the user to save the session or confirm discarding them; use `--discard` only when that loss is explicitly authorized. The UI Reset session button offers Save session and reset, Reset session, and Cancel. Prefer `--replace` when the user only wants a new displayed list.
+
 Before editing, inspect the current buffers and preserve unrelated user changes. Explain the intended change with `note`, then use `edit` to show the proposed full contents in the writable pane. Every file opened by the agent accumulates in the Files tab under **Agent files**, independent of recent history. Use `project` or `folders` for a project review instead of opening and rapidly cycling through every file. The File set selector lets the user return to previous trees. Opening the same source pair reuses its buffers and comments. For a different Git baseline, use an explicit commit SHA. The user can pause **Follow agent**; choosing a file pauses it automatically. Continue editing without forcing navigation while they review. Reserve `reveal` (which explicitly switches the current file even while following is paused) for a user-requested view or a relevant final handoff, not after every edit. Add line comments when they clarify a specific change. Do not claim that the bridge displays hidden reasoning or every keystroke: it displays the edits and explanations you explicitly send.
 
 For Git, use `git` when the requested baseline is a commit. To show only your upcoming changes, including in a non-Git file or a file with existing edits, first capture the current contents in an immutable text source and pair it with the working file. A `request` JSON file has this shape:
@@ -53,7 +63,30 @@ Create JSON with a serializer so source text and paths are preserved exactly. Us
 
 Save when the user's task authorizes applying the changes. If they requested a preview or review before applying, leave the buffer unsaved and explain that. For authorized implementation, save before running tests that read files from disk. Finish by revealing the relevant comparison and reporting what changed and what was verified. The user can export all comparisons and comments with Save session; the bridge does not currently provide an archive export command.
 
-The CLI fetches the latest hash before sending an edit, and the bridge rejects races during that update. Still inspect changes made since your earlier read before replacing a whole buffer. On a stale-buffer or disk-conflict error, reread and reconcile the user changes; do not force a reload or overwrite them. If the connection stops, request a fresh handoff from Connect agent → Copy agent instructions. Do not scan for other sessions' credentials. The handoff contains a descriptor path, not the bearer token; do not print or copy that token into chat.
+The CLI fetches the latest hash before sending an edit, and the bridge rejects races during that update. Still inspect changes made since your earlier read before replacing a whole buffer. On a stale-buffer or disk-conflict error, reread and reconcile the user changes; do not force a reload or overwrite them. If the connection stops, request a fresh handoff from Connect agent → Agent ready · Copy instructions. Do not scan for other sessions' credentials. The handoff contains a descriptor path, not the bearer token; do not print or copy that token into chat.
+
+## Highlight specific lines
+
+For a focused review inside an existing project diff, use `groups` / `list` to find the comparison IDs and inspect **both current buffers**. Keep the complete comparison and publish named groups into **Files → Agent highlights**. Do not create cropped text copies, guess line numbers from a different revision, or cycle through files automatically. Coordinates are 1-based and inclusive, on the specified side. Git and bundled snapshots can be highlighted without making them writable.
+
+Write a JSON file with a serializer, then run `highlight /absolute/highlights.json`. For example:
+
+```json
+{
+  "label": "Validation changes",
+  "color": "#e5a84b",
+  "ranges": [
+    {"sessionId": "ID_FROM_LIST_FOR_FILE_A", "side": "left", "startLine": 12, "endLine": 16, "label": "Previous validation", "comment": "This branch did not check the empty value."},
+    {"sessionId": "ID_FROM_LIST_FOR_FILE_B", "side": "right", "startLine": 30, "endLine": 34, "label": "New validation", "color": "#67b7ef", "comment": "The new check rejects empty values before dispatch."}
+  ]
+}
+```
+
+Use additional groups for separate concerns: five two-line ranges mark ten lines across five files; two ten-line ranges mark twenty lines across two other files. Group colors and optional per-range overrides must be six-digit hex values (`#RRGGBB`). Labels explain the meaning without relying on color alone. `comment` creates an ordinary agent thread at the range's first line; use `comments`, `reply`, and `resolve` to discuss or fix it. You may instead supply `commentId` to attach an existing thread on the same comparison and side. Never supply both fields.
+
+Publishing a group does not move the user's view. Add `--reveal` only when you intend to show the first range, or later use `highlight-reveal GROUP_ID RANGE_ID`. Explicit navigation pauses Follow agent and selects the correct file, side and range. The user can revisit every range from the sidebar. Keep using the original comparison IDs for edits.
+
+To update a group, include its returned `id` in the JSON and the complete replacement `ranges` list. Use existing `commentId` values to retain thread associations; sending `comment` again creates a new thread. Updates return fresh range IDs. Removed or replaced highlights never delete user discussions. Edits before an untouched range shift its coordinates; edits through it mark `outdated: true` and show **Changed since highlight**. Inspect and republish accurate ranges after such edits rather than presenting them as verified locations. Save session includes all groups, colors, ranges and threads and supports offline reopening. Reset clears highlights as well, so highlight-only reviews require explicit discard authorization too.
 
 ## Address review comments
 

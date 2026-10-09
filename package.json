@@ -1,10 +1,10 @@
 {
-  "name": "diff-studio",
-  "displayName": "Diff Studio",
+  "name": "diff-studio-pro",
+  "displayName": "Diff Studio Pro",
   "description": "Built for coding agents: review project diffs, edit side by side, discuss changes with line comments, and share portable review sessions.",
-  "version": "0.5.2",
+  "version": "1.2.0",
   "type": "module",
-  "publisher": "N7K5",
+  "publisher": "KUNU",
   "icon": "assets/marketplace-logo.png",
   "repository": {
     "type": "git",
@@ -34,39 +34,43 @@
     "commands": [
       {
         "command": "diffStudio.open",
-        "title": "Diff Studio: Open Comparison Studio"
+        "title": "Diff Studio Pro: Open Comparison Studio"
       },
       {
         "command": "diffStudio.compareSelected",
-        "title": "Diff Studio: Compare Selected Files"
+        "title": "Diff Studio Pro: Compare Selected Files"
       },
       {
         "command": "diffStudio.gitWorking",
-        "title": "Diff Studio: Compare Current File with Git Revision"
+        "title": "Diff Studio Pro: Compare Current File with Git Revision"
       },
       {
         "command": "diffStudio.gitBase",
-        "title": "Diff Studio: Changes Against Base Branch"
+        "title": "Diff Studio Pro: Changes Against Base Branch"
       },
       {
         "command": "diffStudio.startAgent",
-        "title": "Diff Studio: Start Agent Bridge"
+        "title": "Diff Studio Pro: Start Agent Bridge"
       },
       {
         "command": "diffStudio.stopAgent",
-        "title": "Diff Studio: Stop Agent Bridge"
+        "title": "Diff Studio Pro: Stop Agent Bridge"
       },
       {
         "command": "diffStudio.saveSession",
-        "title": "Diff Studio: Save Session"
+        "title": "Diff Studio Pro: Save Session"
       },
       {
         "command": "diffStudio.openSession",
-        "title": "Diff Studio: Open Saved Session"
+        "title": "Diff Studio Pro: Open Saved Session"
       },
       {
         "command": "diffStudio.copyAgentInstructions",
-        "title": "Diff Studio: Copy Agent Instructions"
+        "title": "Diff Studio Pro: Copy Agent Instructions"
+      },
+      {
+        "command": "diffStudio.resetSession",
+        "title": "Diff Studio Pro: Reset Session"
       }
     ],
     "menus": {
@@ -91,7 +95,7 @@
       ]
     },
     "configuration": {
-      "title": "Diff Studio",
+      "title": "Diff Studio Pro",
       "properties": {
         "diffStudio.layout": {
           "type": "string",
@@ -185,7 +189,7 @@
       "activitybar": [
         {
           "id": "diffStudio",
-          "title": "Diff Studio",
+          "title": "Diff Studio Pro",
           "icon": "assets/diff-studio.svg"
         }
       ]
@@ -194,7 +198,7 @@
       "diffStudio": [
         {
           "id": "diffStudio.navigation",
-          "name": "Diff Studio"
+          "name": "Diff Studio Pro"
         }
       ]
     }
@@ -206,7 +210,7 @@
     "test:ui": "node scripts/test-ui.mjs",
     "test:vscode": "node scripts/test-vscode.mjs",
     "test:remote": "node --import tsx scripts/test-remote.ts",
-    "package": "npm run build && vsce package --no-dependencies --allow-missing-repository --out artifacts/diff-studio.vsix",
+    "package": "npm run build && vsce package --no-dependencies --allow-missing-repository --out artifacts/diff-studio-pro.vsix",
     "vscode:prepublish": "npm run build",
     "agent": "node scripts/agent.mjs",
     "fixtures": "node --import tsx scripts/fixtures.ts"

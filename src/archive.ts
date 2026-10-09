@@ -2,20 +2,21 @@ import {promises as fs} from 'node:fs';
 import path from 'node:path';
 import {randomUUID} from 'node:crypto';
 import {Studio} from './studio';
-import {Source,DocumentState,Session,LineComment,ComparisonGroup,Activity} from './types';
+import {Source,DocumentState,Session,LineComment,ComparisonGroup,Activity,HighlightSet} from './types';
 import {hash,joinLocation} from './transport';
 import {gitRelativePath} from './git';
 import {lines} from './comments';
+import {prepareHighlights} from './highlights';
 
 export const ARCHIVE_LIMIT=256*1048576;
 interface SavedDocument {source:Source;label:string;text:string;savedText:string;initialText:string;language:string;exists:boolean;resolvedRef?:string;sha256:string}
 interface SavedSession {id:string;title:string;left:SavedDocument;right:SavedDocument;comments:LineComment[];activity:Activity[]}
 interface SavedGroup {id:string;label:string;entries:{path:string;status:string;oldPath?:string;sessionId?:string;unavailable?:string}[]}
-export interface Archive {format:'diff-studio/session';version:1;createdAt:string;active?:string;sessions:SavedSession[];groups:SavedGroup[]}
+export interface Archive {format:'diff-studio/session';version:1;createdAt:string;active?:string;sessions:SavedSession[];groups:SavedGroup[];highlights?:HighlightSet[]}
 
 export function createArchive(studio:Studio,active?:string):Archive{
   const document=(d:DocumentState):SavedDocument=>({source:d.origin||d.source,label:d.label,text:d.text,savedText:d.savedText,initialText:d.initialText??d.savedText,language:d.language,exists:d.exists,resolvedRef:d.resolvedRef,sha256:hash(d.text)});
-  return {format:'diff-studio/session',version:1,createdAt:new Date().toISOString(),active,sessions:[...studio.sessions.values()].map(s=>({id:s.id,title:s.title,left:document(s.left),right:document(s.right),comments:structuredClone(s.comments),activity:structuredClone(s.activity)})),groups:[...studio.groups.values()].map(g=>({id:g.id,label:g.label,entries:g.entries.map(e=>({path:e.path,status:e.status,oldPath:e.oldPath,sessionId:e.sessionId,unavailable:e.unavailable}))}))};
+  return {format:'diff-studio/session',version:1,createdAt:new Date().toISOString(),active,highlights:structuredClone([...studio.highlights.values()]),sessions:[...studio.sessions.values()].map(s=>({id:s.id,title:s.title,left:document(s.left),right:document(s.right),comments:structuredClone(s.comments),activity:structuredClone(s.activity)})),groups:[...studio.groups.values()].map(g=>({id:g.id,label:g.label,entries:g.entries.map(e=>({path:e.path,status:e.status,oldPath:e.oldPath,sessionId:e.sessionId,unavailable:e.unavailable}))}))};
 }
 export async function saveArchive(file:string,archive:Archive){
   const data=JSON.stringify(archive,null,2);if(Buffer.byteLength(data)>ARCHIVE_LIMIT)throw new Error('Session archive exceeds the 256 MB limit.');
@@ -61,8 +62,10 @@ export function parseArchive(data:string):Archive{
     if(unavailable!==undefined){if(!unavailable.trim()||e.sessionId!==undefined)throw new Error('Invalid unavailable archive file.');}
     else if(!ids.has(e.sessionId))throw new Error('Archive file references a missing comparison.');
     return {path:text(e.path,'changed path',16000),status:text(e.status,'change status',10),oldPath:e.oldPath===undefined?undefined:text(e.oldPath,'old path',16000),sessionId:e.sessionId,unavailable};})}));
+  const highlightIds=new Set<string>();const sessionMap=new Map(sessions.map(s=>[s.id,s]));
+  const highlights=array(raw.highlights??[],'highlights',100).map(h=>{const set=prepareHighlights(h,id=>{const s=sessionMap.get(id);if(!s)throw new Error('Highlight references a missing comparison.');return s;},true);if(highlightIds.has(set.id))throw new Error('Duplicate highlight group ID.');highlightIds.add(set.id);return set;});
   if(raw.active!==undefined&&!ids.has(raw.active))throw new Error('Archive active comparison is missing.');
-  return {format:'diff-studio/session',version:1,createdAt:text(raw.createdAt,'creation date',100),active:raw.active,sessions,groups};
+  return {format:'diff-studio/session',version:1,createdAt:text(raw.createdAt,'creation date',100),active:raw.active,sessions,groups,highlights};
 }
 export async function readArchive(file:string){const info=await fs.stat(file);if(info.size>ARCHIVE_LIMIT)throw new Error('Session archive exceeds the 256 MB limit.');return parseArchive(await fs.readFile(file,'utf8'));}
 export function importArchive(studio:Studio,archive:Archive){
@@ -70,6 +73,7 @@ export function importArchive(studio:Studio,archive:Archive){
   const document=(d:SavedDocument):DocumentState=>({source:{kind:'text',text:d.text,label:d.label},origin:d.source,label:d.label,text:d.text,savedText:d.savedText,initialText:d.initialText,resolvedRef:d.resolvedRef,version:d.exists?hash(d.savedText):'missing',language:d.language,exists:d.exists,writable:false,dirty:false,archived:true});
   for(const entry of archive.sessions){const id=randomUUID();ids.set(entry.id,id);const session:Session={id,title:entry.title,left:document(entry.left),right:document(entry.right),comments:structuredClone(entry.comments),activity:structuredClone(entry.activity),archived:true};studio.sessions.set(id,session);imported.push(session);}
   for(const group of archive.groups){const restored:ComparisonGroup={id:randomUUID(),label:group.label,entries:group.entries.map(e=>{if(e.unavailable){const placeholder:Source={kind:'text',label:e.path,text:''};return {...e,left:placeholder,right:placeholder};}const id=ids.get(e.sessionId!)!;const s=studio.get(id);return {...e,sessionId:id,left:s.left.source,right:s.right.source};})};studio.groups.set(restored.id,restored);}
+  for(const set of archive.highlights||[]){const restored={...structuredClone(set),id:randomUUID(),ranges:set.ranges.map(r=>({...structuredClone(r),id:randomUUID(),sessionId:ids.get(r.sessionId)!}))};studio.highlights.set(restored.id,restored);}
   return {sessions:imported,active:archive.active?ids.get(archive.active):imported[0]?.id};
 }
 async function safeFile(repo:string,relative:string){

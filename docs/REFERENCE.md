@@ -1,6 +1,8 @@
-# Diff Studio detailed reference
+# Diff Studio Pro detailed reference
 
 For the guided introduction and screenshots, see the [main page](../README.md).
+
+For repeated agent reviews, use **Reset session** to clear the current review while retaining the connection, or use the CLI `--replace` option to explicitly select a new file list while keeping previous comparisons in Session. The reset dialog offers save-first and cancel options. `reset` refuses edits/comments without an authorized `--discard`; `changes JSON_FILE --replace` accepts a labeled list of `{path,left,right}` comparisons. See the [new-review guide](../README.md#start-fresh-or-show-a-different-review) for examples.
 
 A VS Code extension for reviewing and editing differences across local files, SSH machines, directories and Git history. Monaco provides syntax coloring, text editing, inline differences, resizable side-by-side panes and change navigation. The activity panel makes scripted agent edits visible as they happen.
 
@@ -9,10 +11,10 @@ A VS Code extension for reviewing and editing differences across local files, SS
 Install the packaged extension:
 
 ```sh
-code --install-extension artifacts/diff-studio.vsix
+code --install-extension artifacts/diff-studio-pro.vsix
 ```
 
-Click the **Diff Studio icon in VS Code's Activity Bar** to open the studio, or run **Diff Studio: Open Comparison Studio** from the command palette. The Activity Bar view also offers branch review, current-file comparison and agent-bridge shortcuts. Alternatively, select two files in Explorer and use **Diff Studio: Compare Selected Files**. To develop it, run `npm ci && npm run build`, open this folder in VS Code, then press F5.
+Click the **Diff Studio Pro icon in VS Code's Activity Bar** to open the studio, or run **Diff Studio Pro: Open Comparison Studio** from the command palette. The Activity Bar view also offers branch review, current-file comparison and agent-bridge shortcuts. Alternatively, select two files in Explorer and use **Diff Studio Pro: Compare Selected Files**. To develop it, run `npm ci && npm run build`, open this folder in VS Code, then press F5.
 
 ## Comparisons
 
@@ -41,7 +43,7 @@ Hover beside a line number on either side and click **+** to add a comment. You 
 
 **Save session** writes a `.diff_studio` file containing every comparison in the **Session** tab, full text for both sides, initial and saved contents, current unsaved edits, Git revisions, file paths/statuses/renames, activity, and all line comments. Folder/branch comparisons capture every listed text file, including files you have not clicked. Saving the session does not save unsaved edits into the source files. History limits/removals only affect the recent-history list.
 
-Use **Open session**, **Diff Studio: Open Saved Session**, or the Explorer context menu on a `.diff_studio` file in another extension run. Choose **Review bundled snapshots** to review all contents and comments without the original repositories, files, or SSH machines. Use Session to select a saved comparison or folder/branch group. Imported reviews are added to the current session, and bundled file snapshots are read-only; you can add/edit/delete comments and save another archive.
+Use **Open session**, **Diff Studio Pro: Open Saved Session**, or the Explorer context menu on a `.diff_studio` file in another extension run. Choose **Review bundled snapshots** to review all contents and comments without the original repositories, files, or SSH machines. Use Session to select a saved comparison or folder/branch group. Imported reviews are added to the current session, and bundled file snapshots are read-only; you can add/edit/delete comments and save another archive.
 
 The opening dialog also offers **Link a local repository…**; **Link repository** remains available afterward. Select which archived repository to map if there are several. The extension verifies recorded commits and working-file contents before making matching working panes editable. Missing commits, different working contents, paths outside the chosen repository, and unresolved mappings remain detached snapshots. Linking does not apply edits or fetch Git history. A later explicit Save right/left writes a linked file with the existing conflict checks.
 
@@ -71,7 +73,7 @@ The connection picker remembers the last **5** successfully connected VMs and th
 - Drag the sidebar’s right edge to resize it, including while auto-hide is enabled. The width is remembered in **Settings → Sidebar width**. Focus the resize edge and use Left/Right arrows for keyboard resizing. Tree levels use a compact six-pixel indent to leave more room for names.
 - **Auto-hide file list** in Settings collapses the internal comparison sidebar to a narrow handle. Hover over it or focus it with the keyboard to reveal the file list. After a mouse click, moving away hides it immediately. Keyboard navigation keeps it visible while you navigate the list. Click the **☰ hamburger** to toggle auto-hide on or off.
 - **Collapse comparison setup** hides the header and source controls; **Choose files / revisions** restores them. **Hide bottom bar** hides the activity panel and editor footer. The compact toolbar keeps agent controls, session controls and **Settings** accessible. Opening a comparison also collapses setup after success. Manual visibility preferences persist.
-- **Native editor** opens VS Code's native diff. Local files use their real paths. Remote and revision sources open as temporary text snapshots; save remote changes in Diff Studio.
+- **Native editor** opens VS Code's native diff. Local files use their real paths. Remote and revision sources open as temporary text snapshots; save remote changes in Diff Studio Pro.
 
 Clean file buffers refresh every three seconds. Dirty buffers retain their edits. Saving checks the source fingerprint and rejects a changed file instead of silently overwriting it. It also refuses to overwrite a file with unsaved changes in another VS Code editor. Resolve that editor or external change, then reload. The fingerprint check detects preexisting changes; it is not a distributed filesystem lock.
 
@@ -88,17 +90,17 @@ ssh://user@second-host:2222/home/user/project/example.ts
 
 The extension invokes installed OpenSSH using your existing SSH config, known hosts, keys and agent. Establish normal `ssh host` access first. The remote machine needs Python 3; remote Git comparisons also need Git. Password prompts are disabled so a missing key fails visibly. No SSH passwords are collected or stored. Paths and contents are sent as JSON over SSH stdin, not interpolated into shell commands. Spaces and shell characters in paths are supported; URI-reserved characters such as `#` must be percent-encoded.
 
-In a VS Code Remote SSH window, local paths refer to the machine running the workspace extension host. To compare your laptop with a server, open Diff Studio in a local VS Code window and use an `ssh://` URI for the server.
+In a VS Code Remote SSH window, local paths refer to the machine running the workspace extension host. To compare your laptop with a server, open Diff Studio Pro in a local VS Code window and use an `ssh://` URI for the server.
 
 ## Agent scripts
 
-Click **Connect agent**, then **Copy agent instructions** in the always-visible toolbar. Paste the entire handoff into a new Codex session along with your task. It includes the current descriptor, installed CLI and skill paths, extension host/machine context, workspace paths, active comparison, a ready-to-run startup command, and the full bundled Diff Studio skill (`skills/diff-studio/SKILL.md`). No separate skill installation or project checkout is needed. The **Diff Studio: Copy Agent Instructions** command is also available while connected.
+Click **Connect agent**, then **Agent ready · Copy instructions** in the always-visible toolbar. Paste the entire handoff into a new Codex session along with your task. It includes the current descriptor, installed CLI and skill paths, extension host/machine context, workspace paths, active comparison, a ready-to-run startup command, and the full bundled Diff Studio Pro skill (`skills/diff-studio/SKILL.md`). No separate skill installation or project checkout is needed. The **Diff Studio Pro: Copy Agent Instructions** command is also available while connected.
 
-The skill explains how to inspect/reveal comparisons, preserve a before snapshot, open local/SSH/Git files, narrate changes, show buffer edits, add line comments, save, and recover from conflicts. It does not launch a model; “Agent bridge ready” means the connection is available. Disconnect hides the copy button and invalidates the connection. Copy a fresh handoff after reconnecting or reloading VS Code. Connection messages do not occupy the comparison banner.
+The skill explains how to inspect/reveal comparisons, preserve a before snapshot, open local/SSH/Git files, narrate changes, show buffer edits, add line comments, save, and recover from conflicts. It does not launch a model; “Agent ready” means the connection is available. Disconnect disables the status control and hides its copy action and invalidates the connection. Copy a fresh handoff after reconnecting or reloading VS Code. Connection messages do not occupy the comparison banner.
 
 The bridge starts only when requested, binds to loopback on a random port, requires a random bearer token, rejects browser-origin requests, and deletes its credential file when stopped. The descriptor is mode `0600`; the handoff includes its path but never embeds the token. Run the CLI on the extension host machine; a remote host's localhost cannot be reached by using the local machine's localhost. Any process with the descriptor can use the extension host's file permissions.
 
-For manual scripting, the descriptor path is available in the Diff Studio output channel and the copied handoff. The scripts work with Codex or any other local agent; no OpenAI API key or model SDK is needed.
+For manual scripting, the descriptor path is available in the Diff Studio Pro output channel and the copied handoff. The scripts work with Codex or any other local agent; no OpenAI API key or model SDK is needed.
 
 ```sh
 export DIFF_STUDIO_BRIDGE='/path/shown/by/the/extension/agent-....bridge.json'
@@ -134,7 +136,7 @@ The underlying JSON API provides `GET /sessions` and `POST /open`, `/note`, `/ed
 npm test                 # Typecheck, bundle, local/Git/bridge tests
 npm run test:vscode      # Real VS Code extension host and UI clicks
 npm run test:remote      # Real SSH reads, edits, conflicts and Git checks
-npm run package          # Build artifacts/diff-studio.vsix
+npm run package          # Build artifacts/diff-studio-pro.vsix
 ```
 
 UI tests use an isolated VS Code profile in `.test-vscode`, fixtures in `.test-data`, and a debugging port on localhost. Override `VSCODE_EXECUTABLE` and `DIFF_STUDIO_DEBUG_PORT` if needed. Set `DIFF_STUDIO_SSH_HOST` to your own test machine before running remote tests. They create a unique `/tmp/diff-studio-test-*` directory on the server and remove it after testing. JSON test results and screenshots are written to `artifacts/`.
@@ -152,3 +154,11 @@ Agent comparisons remain in **Files → File set → Agent files**, independentl
 The CLI now supports `project REPO [BASE=HEAD] [TARGET=WORKING]`, `folders LEFT RIGHT`, and `groups`. Project commands publish the complete changed-file hierarchy (including unavailable binary entries), without cycling the editor through every file. All supported compared files are retained in the session. Use explicit commit SHAs when requesting a new fixed Git baseline.
 
 Inline comments have **Reply**, **Resolve**, and **Reopen** controls. Agent replies are labeled **Agent**; your replies are labeled **You**. The agent can use `comments [SESSION]`, `reply SESSION COMMENT_ID "text"`, `resolve SESSION COMMENT_ID`, and `reopen SESSION COMMENT_ID`; ordinary edit/save commands implement fixes. Replies and resolution states survive `.diff_studio` export/import. **Copy review request** in Files copies the current connection, full skill and a request to read and address unresolved comments. Paste it into your agent session; adding a comment alone does not start or notify an AI agent.
+
+## Agent line-range highlights
+
+`GET /highlights` lists highlight groups. `POST /highlights` accepts `{id?, label, color?, ranges, reveal?}`. Each range requires `{sessionId, side, startLine}` and optionally `endLine`, `label`, `color`, and either `comment` or `commentId`. Both line endpoints are inclusive; omitted `endLine` selects one line. Colors are six-digit hex values. An existing group `id` replaces its range list; a new group gets a new ID. Returned ranges have their own IDs, `commentId` where applicable, and `outdated` flags.
+
+Validation is atomic for the whole batch. Maximums: 100 groups, 1000 ranges per group, 1000 characters per label and 10000 per comment. Group creation does not change the active comparison unless `reveal: true`. `POST /highlight-reveal` takes `{id, rangeId?}` and explicitly shows that range (or the group's first range). `POST /highlight-remove` takes `{id}` and leaves comment threads intact. The CLI equivalents are `highlights`, `highlight JSON_FILE [--reveal]`, `highlight-reveal GROUP_ID [RANGE_ID]`, and `highlight-remove GROUP_ID`.
+
+The Files tab displays a separate Agent highlights section, independently of the selected file set. Decorations and comment colors use the exact side's line numbers. Navigating to a left-side range from inline mode switches to side-by-side so the original coordinates are visible. Positions follow edits outside the range; intersecting edits conservatively mark the range changed until the agent republishes it. Archive version 1 gains an optional `highlights` field; older archives remain readable. Imports assign new group, range, and comparison IDs while retaining comment associations.

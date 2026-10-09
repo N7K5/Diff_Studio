@@ -1,8 +1,8 @@
-# Diff Studio
+# Diff Studio Pro
 
 **Built for coding agents. Designed for you to review every change.**
 
-Diff Studio gives you and your coding agent a shared place to compare files, preview edits, discuss individual lines, and revisit a whole project's changes inside VS Code. Connect an agent, give it your task, and keep the resulting comparisons in a browsable file tree while you review at your own pace.
+Diff Studio Pro gives you and your coding agent a shared place to compare files, preview edits, discuss individual lines, and revisit a whole project's changes inside VS Code. Connect an agent, give it your task, and keep the resulting comparisons in a browsable file tree while you review at your own pace.
 
 Use it alongside Codex or another agent that can run local commands. It also works as a standalone diff editor for local files, Git history, folders, and SSH machines.
 
@@ -28,7 +28,7 @@ Use it alongside Codex or another agent that can run local commands. It also wor
 
 ## Start a comparison
 
-1. Install **Diff Studio** and open the **Diff Studio icon** in VS Code's Activity Bar. You can also run **Diff Studio: Open Comparison Studio** from the command palette.
+1. Install **Diff Studio Pro** and open the **Diff Studio Pro icon** in VS Code's Activity Bar. You can also run **Diff Studio Pro: Open Comparison Studio** from the command palette.
 2. Choose **Two files**, **Two folders**, **Revision ↔ working file**, **Two Git revisions**, or **Changes against branch**.
 3. Browse your sources. For a Git project, leave **File or folder** empty to list all changed files, or select a particular file or folder.
 4. Click **Open comparison**. Select files in the tree and use **Previous / Next** to move between changes.
@@ -40,19 +40,19 @@ Comparison setup collapses after a successful open. **Choose files / revisions**
 
 ### 1. Connect and copy the instructions
 
-Click **Connect agent**, then **Copy agent instructions**. Paste the complete handoff into your agent session together with your task.
+Click **Connect agent**, then **Agent ready · Copy instructions**. Paste the complete handoff into your agent session together with your task.
 
-The handoff includes the connection details, installed command-line script, current workspace context, and the complete bundled Diff Studio skill. The agent does not need to clone this repository or install the skill separately. It needs Node.js 18+ and access to the machine running the VS Code extension host.
+The handoff includes the connection details, installed command-line script, current workspace context, and the complete bundled Diff Studio Pro skill. The agent does not need to clone this repository or install the skill separately. It needs Node.js 18+ and access to the machine running the VS Code extension host.
 
 For example, after pasting the handoff:
 
-> Review this project against `main`. Show all changed files in Diff Studio as one project tree. Explain the risky changes, preserve my existing edits, and do not modify files yet.
+> Review this project against `main`. Show all changed files in Diff Studio Pro as one project tree. Explain the risky changes, preserve my existing edits, and do not modify files yet.
 
 ### 2. Preview the work and keep your place
 
 Ask the agent to show a comparison before changing a file, publish a whole project review, or add comparisons one by one. The files stay available in **Agent files**, independently of the recent-history limit. Reopening the same source pair preserves its existing buffers and comments.
 
-> Add bounded retries to the product API client. Preserve the original code on the left and preview your edits on the right. Keep every touched file in Diff Studio and explain each change. Wait for my review before saving.
+> Add bounded retries to the product API client. Preserve the original code on the left and preview your edits on the right. Keep every touched file in Diff Studio Pro and explain each change. Wait for my review before saving.
 
 Choose any file to pause **Follow agent**, or uncheck it yourself. Re-enable it when you want to follow subsequent agent operations. An explicit agent `reveal` command can still select a file; the bundled instructions tell agents to reserve it for a requested view or a relevant handoff.
 
@@ -68,7 +68,7 @@ Hover next to a line number and click **+**, or select a line and click **Commen
 
 When your comments are ready, click **Copy review request** in the Files tab and paste it into the agent session. You can add instructions such as:
 
-> Read all unresolved comments in Diff Studio. Fix the retry behavior, add tests for 404 and 503 responses, and reply to each thread with what changed and what you verified. Resolve only the requests you have completed.
+> Read all unresolved comments in Diff Studio Pro. Fix the retry behavior, add tests for 404 and 503 responses, and reply to each thread with what changed and what you verified. Resolve only the requests you have completed.
 
 The agent can read comments, reply in the same threads, edit the existing comparisons, and resolve verified fixes. Your original comments remain visible. If edits move a line, its comment moves with it; changed or deleted anchors retain their original text and are marked for review.
 
@@ -76,13 +76,40 @@ The agent can read comments, reply in the same threads, edit the existing compar
 
 ## Practical examples
 
+### Start fresh or show a different review
+
+Choose **Manage session → Reset session** to clear open comparisons, file trees, comments, activity, and recent history. Choose **Save session and reset** to keep a portable copy first, **Reset session** to discard the current review, or **Cancel**. Disk files, saved archives, settings, and your agent connection stay intact. Follow agent is enabled again, so the next comparison appears immediately.
+
+For a new displayed list without losing earlier comparisons, ask your agent:
+
+> Show the changes against `main` as a new review using `project --replace`. Replace the displayed file list and bring it into view, even if Follow agent is paused. Preserve my earlier comparisons and comments.
+
+The CLI accepts `--replace` with `project`, `folders`, `open`, `git`, `revisions`, `request`, and `changes`. It replaces **Agent files**, selects the new tree and first supported file, and clears old filters. Earlier comparisons remain in **Session**. Normal background edits still respect paused navigation. An empty replacement shows an empty review instead of leaving an unrelated diff on screen.
+
+Agents can publish a custom list using `changes /path/review.json --replace`:
+
+```json
+{
+  "label": "API review",
+  "comparisons": [
+    {
+      "path": "src/api/products.ts",
+      "left": { "kind": "git", "repo": "/home/alex/catalog", "path": "src/api/products.ts", "ref": "main" },
+      "right": { "kind": "file", "uri": "/home/alex/catalog/src/api/products.ts" }
+    }
+  ]
+}
+```
+
+For a full agent-driven reset, use `reset`. It refuses to discard edits or comments unless `--discard` is explicitly provided; agents should use that flag only with your authorization. Reset invalidates old comparison IDs but keeps the same connection available. Copy fresh agent instructions after upgrading so your agent knows these commands.
+
 ### Review everything changed against a branch
 
 Choose **Changes against branch**, browse the repository, and pick `main`, `master`, or another base from the version dropdown. Include working, staged, and untracked changes, or narrow the view to committed or staged changes. Enable **Compare from common ancestor** for a branch review based on the merge base.
 
 Agent prompt:
 
-> Show the whole project against `main` in Diff Studio. Keep a browsable tree, including new and deleted files. Let me navigate without switching files after every edit.
+> Show the whole project against `main` in Diff Studio Pro. Keep a browsable tree, including new and deleted files. Let me navigate without switching files after every edit.
 
 ### Find a regression between two releases
 
@@ -94,13 +121,13 @@ Choose **Two Git revisions**, select your repository and file, then choose a bra
 
 Agent prompt:
 
-> Compare `v1.0` and `v1.1` for the catalog code. Show the changed files in Diff Studio and add comments explaining changes that could affect error handling. Do not edit the working tree.
+> Compare `v1.0` and `v1.1` for the catalog code. Show the changed files in Diff Studio Pro and add comments explaining changes that could affect error handling. Do not edit the working tree.
 
 ### Preview a refactor before saving
 
 Compare `HEAD` with a working file, or ask the agent to preserve the original contents as a text snapshot. Review the proposed buffer and make your own edits in the writable pane.
 
-> Refactor this function without changing its behavior. Show the original and proposed code in Diff Studio. Explain the intended change in the activity panel, and leave the proposal unsaved until I review it.
+> Refactor this function without changing its behavior. Show the original and proposed code in Diff Studio Pro. Explain the intended change in the activity panel, and leave the proposal unsaved until I review it.
 
 ### Compare configuration across machines
 
@@ -130,11 +157,13 @@ Both file panes are writable when the sources support it. Saving is explicit. SS
 
 Choose **Two folders**, browse the original and updated directories, and open the changed-file tree. Identical files are omitted. Use this for generated output, configuration migrations, or a before-and-after copy of a project. Local/remote and remote/remote folder pairs are supported too.
 
-> Compare `/home/alex/export-before` with `/home/alex/export-after`. Publish the folder tree in Diff Studio and explain the changed JSON fields. Leave the files unchanged.
+> Compare `/home/alex/export-before` with `/home/alex/export-after`. Publish the folder tree in Diff Studio Pro and explain the changed JSON fields. Leave the files unchanged.
 
 ### Share a review without sharing a repository
 
-Click **Save session** to create a `.diff_studio` file. It captures supported file contents from both sides, current edits, compared groups, source metadata, activity, comments, replies, and resolution states. Captured folder and branch comparisons include supported files you have not clicked.
+The **Manage session** dropdown contains **Open session**, **Save session**, **Reset session**, **View session**, and **Link repository**. The session comparison count stays visible beside it, including when there are no comparisons.
+
+Choose **Manage session → Save session** to create a `.diff_studio` file. It captures supported file contents from both sides, current edits, compared groups, source metadata, activity, comments, replies, and resolution states. Captured folder and branch comparisons include supported files you have not clicked.
 
 Send that file to a teammate. They choose **Open session → Review bundled snapshots** and can browse the comparisons and add comments without your repository, commit history, or SSH access.
 
@@ -206,13 +235,13 @@ node "$CLI" save SESSION_ID right
 node "$CLI" resolve SESSION_ID COMMENT_ID
 ```
 
-The bridge operates on the extension host machine and displays the comparisons, explanations, and edits an agent explicitly sends. It does not capture hidden reasoning or every keystroke. Diff Studio does not require a model API key; your agent runs separately. Concurrent buffer edits and externally changed files are checked before overwrite. See the [detailed reference](docs/REFERENCE.md) and [bundled agent skill](skills/diff-studio/SKILL.md) for more examples, snapshot requests, connection details, and recovery behavior.
+The bridge operates on the extension host machine and displays the comparisons, explanations, and edits an agent explicitly sends. It does not capture hidden reasoning or every keystroke. Diff Studio Pro does not require a model API key; your agent runs separately. Concurrent buffer edits and externally changed files are checked before overwrite. See the [detailed reference](docs/REFERENCE.md) and [bundled agent skill](skills/diff-studio/SKILL.md) for more examples, snapshot requests, connection details, and recovery behavior.
 
 ## Requirements and scope
 
 VS Code **1.100 or newer**. Agent scripts require **Node.js 18+**. Git comparisons require Git. In a Remote SSH window, local paths refer to the remote extension host; use a local VS Code window to compare laptop files with `ssh://` sources.
 
-Diff Studio compares UTF-8 text, with a default file limit of 10 MB that can be changed in Settings. It supports BOM, Unicode, CRLF, and empty files. It is a two-way text comparison tool; it does not provide three-way merge resolution, image/binary diffs, or semantic AST comparison. Unavailable file contents are not bundled in saved sessions; their paths and reasons are retained.
+Diff Studio Pro compares UTF-8 text, with a default file limit of 10 MB that can be changed in Settings. It supports BOM, Unicode, CRLF, and empty files. It is a two-way text comparison tool; it does not provide three-way merge resolution, image/binary diffs, or semantic AST comparison. Unavailable file contents are not bundled in saved sessions; their paths and reasons are retained.
 
 ## Source, support, and development
 
@@ -224,7 +253,27 @@ npm test
 npm run test:vscode
 mkdir -p artifacts
 npm run package
-code --install-extension artifacts/diff-studio.vsix
+code --install-extension artifacts/diff-studio-pro.vsix
 ```
 
 Open the checkout in VS Code and press **F5** to develop the extension. Tests use disposable fixtures and an isolated VS Code profile. See [TESTING.md](TESTING.md) for coverage and environment details. Licensed under [MIT](LICENSE).
+
+## Focus an agent review on specific lines
+
+Agents can keep a full project diff open and add named, colored line ranges across multiple files. **Files → Agent highlights** lists each group, file, side, and line range. Click a range to navigate to it; comments use its color and support the same reply and resolution workflow.
+
+For example, ask: “Show the full diff between these commits. Highlight the ten validation lines across these five files in gold, and the twenty retry-handling lines across those two files in blue. Add an explanation to each range.”
+
+The agent uses `groups` or `list` to obtain comparison IDs, then `highlight highlights.json` with a payload such as:
+
+```json
+{
+  "label": "Validation changes",
+  "color": "#e5a84b",
+  "ranges": [
+    {"sessionId": "comparison-id", "side": "right", "startLine": 12, "endLine": 16, "label": "Input validation", "comment": "Reject empty values before dispatch."}
+  ]
+}
+```
+
+Ranges use inclusive line numbers from the chosen side. Each range can override the group color. `highlight-reveal GROUP_ID RANGE_ID` jumps directly to a range; `highlight-remove GROUP_ID` removes its highlights while preserving comments. Save session includes the groups, colors, ranges and discussion threads for offline review. Edits through a range mark it **Changed since highlight** so the agent can review and update it.

@@ -3,15 +3,36 @@ import type {Session, Settings, ChangeEntry, Revision, RevisionPage} from '../sr
 import {defaults} from '../src/types';
 import {CommentUI} from './comments';
 import {Sidebar} from './sidebar';
+import {installTooltips} from './tooltips';
+import {HighlightUI} from './highlights';
 import {changeTree, ChangeNode} from '../src/tree';
 import type {ComparisonTarget} from '../src/recent';
 declare function acquireVsCodeApi(): {postMessage(message:unknown):void; getState():any; setState(state:any):void};
 const api=acquireVsCodeApi();
+installTooltips();
 const $=<T extends HTMLElement=HTMLElement>(id:string)=>document.getElementById(id) as T;
 const input=(id:string)=>$<HTMLInputElement>(id);
 const value=(id:string)=>input(id).value;
 const send=(message:object)=>api.postMessage(message);
 const action=(id:string,fn:()=>void)=>$(id).addEventListener('click',fn);
+const sessionMenu=$('session-menu');const sessionToggle=$('manage-session');const sessionDropdown=$('session-dropdown');
+const sessionItems=Array.from(sessionMenu.querySelectorAll<HTMLButtonElement>('[role="menuitem"]'));
+function closeSessionMenu(restoreFocus=false){sessionMenu.hidden=true;sessionToggle.setAttribute('aria-expanded','false');if(restoreFocus)sessionToggle.focus();}
+function openSessionMenu(last=false){sessionMenu.hidden=false;sessionToggle.setAttribute('aria-expanded','true');sessionItems[last?sessionItems.length-1:0].focus();}
+action('manage-session',()=>sessionMenu.hidden?openSessionMenu():closeSessionMenu(true));
+sessionToggle.addEventListener('keydown',event=>{if(event.key==='ArrowDown'||event.key==='ArrowUp'){event.preventDefault();openSessionMenu(event.key==='ArrowUp');}});
+sessionMenu.addEventListener('keydown',event=>{
+ const index=sessionItems.indexOf(document.activeElement as HTMLButtonElement);
+ if(['ArrowDown','ArrowUp','Home','End'].includes(event.key)){
+  event.preventDefault();const next=event.key==='Home'?0:event.key==='End'?sessionItems.length-1:(index+(event.key==='ArrowDown'?1:-1)+sessionItems.length)%sessionItems.length;sessionItems[next].focus();
+ }else if(event.key==='Escape'){event.preventDefault();event.stopPropagation();closeSessionMenu(true);}
+ else if(event.key==='Tab'){closeSessionMenu(true);}
+});
+// Close before dispatching an action that may move focus into a VS Code picker.
+sessionMenu.addEventListener('click',event=>{if((event.target as Element).closest('[role="menuitem"]'))closeSessionMenu(true);},true);
+document.addEventListener('pointerdown',event=>{if(!sessionDropdown.contains(event.target as Node))closeSessionMenu();});
+document.addEventListener('focusin',event=>{if(!sessionDropdown.contains(event.target as Node))closeSessionMenu();});
+window.addEventListener('blur',()=>closeSessionMenu());
 let composerCollapsed=false;let copiedTimer:ReturnType<typeof setTimeout>|undefined;
 let config:Settings={...defaults};let session:Session|undefined;let changes:ChangeEntry[]=[];
 let models:{original:monaco.editor.ITextModel;modified:monaco.editor.ITextModel}|undefined;
@@ -29,7 +50,8 @@ function theme(){const light=document.body.classList.contains('vscode-light');co
 theme();new MutationObserver(theme).observe(document.body,{attributes:true,attributeFilter:['class']});
 const editor=monaco.editor.createDiffEditor($('diff-editor'),{automaticLayout:true,originalEditable:true,readOnly:false,renderSideBySide:true,useInlineViewWhenSpaceIsLimited:false,enableSplitViewResizing:true,minimap:{enabled:false},scrollBeyondLastLine:false,fontSize:13,ignoreTrimWhitespace:false,renderMarginRevertIcon:true,accessibilityVerbose:true});
 const focusEditor=monaco.editor.create($('focus-editor'),{automaticLayout:true,minimap:{enabled:false},scrollBeyondLastLine:false});
-const commentUI=new CommentUI([{editor:editor.getOriginalEditor(),side:()=> 'left',visible:()=>!$('diff-editor').hidden&&value('layout')!=='inline'},{editor:editor.getModifiedEditor(),side:()=> 'right',visible:()=>!$('diff-editor').hidden,includeLeft:()=>value('layout')==='inline',mapLine:(side,line)=>{if(side==='right'||value('layout')!=='inline')return line;let delta=0;for(const change of editor.getLineChanges()||[]){if(line<change.originalStartLineNumber)break;if(change.originalEndLineNumber&&line<=change.originalEndLineNumber)return change.modifiedEndLineNumber?change.modifiedStartLineNumber+Math.min(line-change.originalStartLineNumber,change.modifiedEndLineNumber-change.modifiedStartLineNumber):change.modifiedStartLineNumber;const oldLength=change.originalEndLineNumber?change.originalEndLineNumber-change.originalStartLineNumber+1:0;const newLength=change.modifiedEndLineNumber?change.modifiedEndLineNumber-change.modifiedStartLineNumber+1:0;delta+=newLength-oldLength;}return line+delta;}},{editor:focusEditor,side:()=>value('layout')==='left'?'left':'right',visible:()=>!$('focus-editor').hidden}],()=>session,send);
+const highlightUI=new HighlightUI(()=>session,()=>models,send);
+const commentUI=new CommentUI([{editor:editor.getOriginalEditor(),side:()=> 'left',visible:()=>!$('diff-editor').hidden&&value('layout')!=='inline'},{editor:editor.getModifiedEditor(),side:()=> 'right',visible:()=>!$('diff-editor').hidden,includeLeft:()=>value('layout')==='inline',mapLine:(side,line)=>{if(side==='right'||value('layout')!=='inline')return line;let delta=0;for(const change of editor.getLineChanges()||[]){if(line<change.originalStartLineNumber)break;if(change.originalEndLineNumber&&line<=change.originalEndLineNumber)return change.modifiedEndLineNumber?change.modifiedStartLineNumber+Math.min(line-change.originalStartLineNumber,change.modifiedEndLineNumber-change.modifiedStartLineNumber):change.modifiedStartLineNumber;const oldLength=change.originalEndLineNumber?change.originalEndLineNumber-change.originalStartLineNumber+1:0;const newLength=change.modifiedEndLineNumber?change.modifiedEndLineNumber-change.modifiedStartLineNumber+1:0;delta+=newLength-oldLength;}return line+delta;}},{editor:focusEditor,side:()=>value('layout')==='left'?'left':'right',visible:()=>!$('focus-editor').hidden}],()=>session,send,(side,line,id)=>highlightUI.commentStyle(side,line,id));
 for(const l of monaco.languages.getLanguages().sort((a,b)=>a.id.localeCompare(b.id))){const option=document.createElement('option');option.value=l.id;option.textContent=l.aliases?.[0]||l.id;$('language').append(option);}
 function showMessage(text:string,error=false){$('message').textContent=text;$('message').hidden=!text;$('message').classList.toggle('error',error);}
 const sidebar=new Sidebar($('sidebar-rail'),$('sidebar-handle'),$('sidebar-resizer'),()=>config,(key,value)=>changeSetting(key,value));
@@ -55,7 +77,7 @@ function applyLayout(){
  $('left-head').hidden=layout==='right';$('right-head').hidden=layout==='left';
  if(single&&session&&models){focused=layout;focusEditor.setModel(layout==='left'?models.original:models.modified);focusEditor.updateOptions({readOnly:!session[layout].writable});focusEditor.layout();}
  else {editor.updateOptions({renderSideBySide:layout!=='inline'});editor.layout();}
- commentUI.render();
+ commentUI.render();highlightUI.render();
 }
 function metadata(){
  if(!session||!models)return;
@@ -68,7 +90,7 @@ function metadata(){
  $('save-state').classList.toggle('unsaved',session.left.dirty||session.right.dirty);
 }
 function renderSession(next:Session,reason?:string){
- const isNew=next.id!==session?.id||reason==='swap';const previous=session;session=next;
+ const isNew=next.id!==session?.id||reason==='swap';const previous=session;session=next;if(isNew)$('highlight-focus').hidden=true;
  $('empty').hidden=true;$('comparison').hidden=false;$('title').textContent=next.title;
  changing=true;
  if(isNew||!models){
@@ -81,6 +103,12 @@ function renderSession(next:Session,reason?:string){
  changing=false;editor.updateOptions({originalEditable:next.left.writable,readOnly:!next.right.writable});
  input('language').value=next.right.language;metadata();applyLayout();if(isNew)commentUI.render(true);renderActivity();for(const b of Array.from(document.querySelectorAll<HTMLElement>('#changes [data-session-id]')))b.setAttribute('aria-current',String(b.dataset.sessionId===session.id));
 }
+function clearComparison(){
+ changing=true;highlightUI.clear();$('highlight-focus').hidden=true;session=undefined;commentUI.clear();for(const d of disposables)d.dispose();disposables=[];
+ editor.setModel(null);focusEditor.setModel(null);models?.original.dispose();models?.modified.dispose();models=undefined;changing=false;
+ $('comparison').hidden=true;$('empty').hidden=false;for(const id of ['title','stats','left-name','right-name','left-info','right-info','save-state'])$(id).textContent='';renderActivity();
+}
+action('reset-session',()=>send({type:'resetSession'}));
 function renderActivity(){
  $('activity-list').replaceChildren();for(const item of session?.activity||[]){const li=document.createElement('li');const time=document.createElement('time');time.textContent=new Date(item.time).toLocaleTimeString();const text=document.createElement('span');text.textContent=item.message;li.append(time,text);li.className=item.kind;$('activity-list').append(li);}$('activity-list').scrollTop=$('activity-list').scrollHeight;
 }
@@ -173,6 +201,7 @@ let activeSidebar:'files'|'history'|'review'='files';
 function sidebarTab(tab:'files'|'history'|'review'){
  activeSidebar=tab;for(const name of ['files','history','review']){$(`${name}-panel`).hidden=name!==tab;const button=$(`${name}-tab`);button.setAttribute('aria-selected',String(name===tab));button.tabIndex=name===tab?0:-1;}
 }
+action('view-session',()=>{sidebarTab('review');sidebar.reveal($('review-tab'));});
 const sidebarTabs=['files','review','history'] as const;
 for(const name of sidebarTabs){action(`${name}-tab`,()=>sidebarTab(name));$(`${name}-tab`).addEventListener('keydown',event=>{if(['ArrowLeft','ArrowRight','Home','End'].includes(event.key)){event.preventDefault();const index=sidebarTabs.indexOf(name);const next=event.key==='Home'?'files':event.key==='End'?'history':sidebarTabs[(index+(event.key==='ArrowRight'?1:2))%3];sidebarTab(next);$(`${next}-tab`).focus();}});}
 
@@ -195,8 +224,8 @@ $('changes').addEventListener('keydown',event=>{
 function renderHistory(items:any[],unsaved:any[]){
  $('sessions').replaceChildren();$('session-count').textContent=String(items.length);$('history-empty').hidden=items.length>0;
  $('history-empty').textContent=config.comparisonHistoryLimit===0?'Comparison history is disabled in Settings.':'Your recent comparisons appear here.';
- for(const item of items){const row=document.createElement('div');row.className='history-row';const button=document.createElement('button');button.className='session-item';button.textContent=`${item.dirty?'● ':''}${item.title}`;button.title=`${item.detail}\nOpened ${new Date(item.time).toLocaleString()}`;button.setAttribute('aria-current',String(item.active));button.onclick=()=>{busy();send({type:'historyOpen',id:item.id});};const remove=document.createElement('button');remove.className='history-remove';remove.textContent='×';remove.title='Remove from history';remove.setAttribute('aria-label',`Remove ${item.title} from history`);remove.onclick=()=>send({type:'historyRemove',id:item.id});row.append(button,remove);$('sessions').append(row);}
- $('unsaved').replaceChildren();$('unsaved-section').hidden=!unsaved.length;for(const item of unsaved){const button=document.createElement('button');button.className='session-item';button.textContent=`● ${item.title}`;button.title='Unsaved buffer retained independently of history';button.onclick=()=>send({type:'select',id:item.id});$('unsaved').append(button);}
+ for(const item of items){const row=document.createElement('div');row.className='history-row';const button=document.createElement('button');button.className='session-item';button.textContent=`${item.dirty?'● ':''}${item.title}`;button.title=`${item.title}\n${item.detail}\nOpened ${new Date(item.time).toLocaleString()}`;button.setAttribute('aria-current',String(item.active));button.onclick=()=>{busy();send({type:'historyOpen',id:item.id});};const remove=document.createElement('button');remove.className='history-remove';remove.textContent='×';remove.title='Remove from history';remove.setAttribute('aria-label',`Remove ${item.title} from history`);remove.onclick=()=>send({type:'historyRemove',id:item.id});row.append(button,remove);$('sessions').append(row);}
+ $('unsaved').replaceChildren();$('unsaved-section').hidden=!unsaved.length;for(const item of unsaved){const button=document.createElement('button');button.className='session-item';button.textContent=`● ${item.title}`;button.title=`${item.title}\nUnsaved buffer retained independently of history`;button.onclick=()=>send({type:'select',id:item.id});$('unsaved').append(button);}
 }
 function restoreSources(target:ComparisonTarget){
  if(target.type==='open'){const left=target.request.left,right=target.request.right;if(left.kind==='git'){input('mode').value=right.kind==='git'?'gitRevisions':'gitWorking';input('repo').value=left.repo;input('git-file').value=left.path;input('left-ref').value=left.ref;input('right-ref').value=right.kind==='git'?right.ref:'HEAD';}else if(left.kind==='file'&&right.kind==='file'){input('mode').value='files';input('left-path').value=left.uri;input('right-path').value=right.uri;}}
@@ -208,22 +237,31 @@ $('filter').addEventListener('input',renderChanges);
 window.addEventListener('message',event=>{
  const m=event.data;
  switch(m.type){
+  case 'clearComparison':clearComparison();break;
+  case 'reset':{
+   closeSessionMenu();clearComparison();changes=[];input('filter').value='';collapsedFolders.clear();$('file-count').textContent='0';renderChanges();renderHistory([],[]);sidebarTab('files');
+   clearTimeout(revisionTimer);revisionRequest++;revisionRefs=[];revisionCommits=[];nextRevisionOffset=0;
+   input('mode').value='files';for(const id of ['left-path','right-path','git-file'])input(id).value='';input('repo').value=m.repo||'';input('left-ref').value='HEAD';input('right-ref').value='HEAD';input('git-mode').value='working';input('revision-order').value='newest';input('merge-base').checked=false;
+   input('layout').value=config.layout;focused='right';composerCollapsed=false;$('settings').hidden=true;api.setState(undefined);modeChanged();applyPanelVisibility();showMessage('Session reset. Ready for new comparisons.');$<HTMLButtonElement>('compare').disabled=false;break;
+  }
   case 'init':if(!value('repo'))input('repo').value=m.repo;bridgePath=m.bridgePath;queueRevisions();break;
   case 'session':renderSession(m.session,m.reason);break;
   case 'comments':if(session&&session.id===m.id){session.comments=m.comments;commentUI.render();}break;
   case 'notice':showMessage(m.message);break;
   case 'archiveOpened':sidebarTab('review');break;
+  case 'highlightFocus':{const range=highlightUI.select(m.id,m.rangeId);if(!range||range.sessionId!==session?.id)break;sidebarTab('files');if(value('layout')==='left'&&range.side==='right'||value('layout')==='right'&&range.side==='left'||value('layout')==='inline'&&range.side==='left'){input('layout').value='sideBySide';applyLayout();}const ed=value('layout')==='left'||value('layout')==='right'?focusEditor:range.side==='left'?editor.getOriginalEditor():editor.getModifiedEditor();focused=range.side;ed.revealLinesInCenter(range.startLine,range.endLine);ed.setSelection(new monaco.Range(range.startLine,1,range.endLine,ed.getModel()!.getLineMaxColumn(range.endLine)));ed.focus();$('highlight-focus').hidden=false;$('highlight-focus').textContent=`Highlighted: ${range.side} ${range.startLine}–${range.endLine}${range.label?' · '+range.label:''}${range.outdated?' · Changed since highlight':''}`;break;}
   case 'catalog':{
+   if(highlightUI.update(m.highlights||[],m.sessions))commentUI.render(true);
    const selected=m.currentGroup||value('file-set');$('file-set').replaceChildren();for(const group of m.groups){const option=document.createElement('option');option.value=group.id;option.textContent=`${group.label} (${group.count})`;$('file-set').append(option);}if(!m.groups.length){const option=document.createElement('option');option.textContent='No comparisons yet';option.value='';$('file-set').append(option);}input('file-set').value=selected;
    $('review-count').textContent=String(m.sessions.length);$('archive-state').textContent=`${m.dirty?'● ':''}${m.archivePath?'Session file open':'Session'} · ${m.sessions.length} comparisons`;$('archive-state').title=m.archivePath||'Save session to keep all comparisons and comments';
-   $('review-sessions').replaceChildren();for(const s of m.sessions){const b=document.createElement('button');b.className='session-item';b.textContent=`${s.title}${s.comments?' · 💬 '+s.comments:''}`;b.title=s.detail||s.title;b.onclick=()=>send({type:'select',id:s.id});$('review-sessions').append(b);}
+   $('review-sessions').replaceChildren();for(const s of m.sessions){const b=document.createElement('button');b.className='session-item';b.textContent=`${s.title}${s.comments?' · 💬 '+s.comments:''}`;b.title=s.detail?`${s.title}\n${s.detail}`:s.title;b.onclick=()=>send({type:'select',id:s.id});$('review-sessions').append(b);}
    $('review-groups').replaceChildren();for(const g of m.groups){const b=document.createElement('button');b.className='session-item review-group';b.textContent=`▸ ${g.label} (${g.count})`;b.title=g.label;b.onclick=()=>send({type:'groupSelect',id:g.id});$('review-groups').append(b);}break;
   }
   case 'settings':{const old=config.layout;config={...m.settings,...pendingSettings};applySettings();if(!session||old!==config.layout){input('layout').value=config.layout;applyLayout();}break;}
   case 'settingSaved':{const key=m.key as keyof Settings;if(pendingSettings[key]===m.value)delete pendingSettings[key];config={...m.settings,...pendingSettings};applySettings();if(key==='layout'){input('layout').value=config.layout;applyLayout();}break;}
   case 'sessions':renderHistory(m.sessions,m.unsaved||[]);break;
   case 'restoreSources':restoreSources(m.target);break;
-  case 'changes':if(!m.preserveTab)sidebarTab('files');if(m.id)input('file-set').value=m.id;changes=m.entries;$('file-count').textContent=String(changes.length);renderChanges();showMessage(`${m.label} · ${changes.length} changed files${changes.some(e=>e.unavailable)?` · ${changes.filter(e=>e.unavailable).length} unavailable for text comparison`:''}`);break;
+  case 'changes':if(m.clearFilter){input('filter').value='';collapsedFolders.clear();}if(!m.preserveTab)sidebarTab('files');if(m.id)input('file-set').value=m.id;changes=m.entries;$('file-count').textContent=String(changes.length);renderChanges();showMessage(`${m.label} · ${changes.length} changed files${changes.some(e=>e.unavailable)?` · ${changes.filter(e=>e.unavailable).length} unavailable for text comparison`:''}`);break;
   case 'picked':{const changed=value(m.field)!==m.value;input(m.field).value=m.value;api.setState(Object.fromEntries(formKeys.map(k=>[k,value(k)])));if(changed&&['repo','git-file'].includes(m.field))queueRevisions();if(['left-ref','right-ref'].includes(m.field))renderRevisionOptions();break;}
   case 'revisions':{if(m.requestId!==revisionRequest)break;const page=m.page as RevisionPage;revisionRefs=page.refs;revisionCommits=m.append?[...new Map([...revisionCommits,...page.commits].map(r=>[r.ref,r])).values()]:page.commits;nextRevisionOffset=page.nextOffset;renderRevisionOptions();$('more-versions').hidden=!page.hasMore;$<HTMLButtonElement>('more-versions').disabled=false;$('revision-info').textContent=`${revisionCommits.length} commits loaded · ${value('mode')!=='gitBase'&&value('git-file')?'selected path':'repository history'} · local time`;break;}
   case 'revisionError':if(m.requestId===revisionRequest){$('revision-info').textContent=m.message;$('more-versions').hidden=true;}break;
@@ -231,8 +269,8 @@ window.addEventListener('message',event=>{
   case 'done':$<HTMLButtonElement>('compare').disabled=false;if($('message').textContent==='Loading comparison…')showMessage('');break;
   case 'comparisonOpened':composerCollapsed=true;applyPanelVisibility();break;
   case 'agentFollow':input('follow-agent').checked=m.value;$('follow-agent-control').dataset.follow=String(m.value);break;
-  case 'agentInstructionsCopied':if(m.review){$('copy-review').textContent='Review request copied';setTimeout(()=>$('copy-review').textContent='Copy review request',2500);break;}$('copy-agent').textContent='Instructions copied';clearTimeout(copiedTimer);copiedTimer=setTimeout(()=>$('copy-agent').textContent='Copy agent instructions',2500);break;
-  case 'bridge':bridgePath=m.path;clearTimeout(copiedTimer);$('bridge-status').textContent=bridgePath?'Agent bridge ready':'Agent offline';$('bridge-status').classList.toggle('connected',!!bridgePath);$('agent').textContent=bridgePath?'Disconnect agent':'Connect agent';$('copy-agent').hidden=!bridgePath;$('follow-agent-control').hidden=!bridgePath;$('copy-review').hidden=!bridgePath;$('copy-agent').textContent='Copy agent instructions';break;
+  case 'agentInstructionsCopied':if(m.review){$('copy-review').textContent='Review request copied';setTimeout(()=>$('copy-review').textContent='Copy review request',2500);break;}$('copy-agent-label').textContent=' · Instructions copied';clearTimeout(copiedTimer);copiedTimer=setTimeout(()=>$('copy-agent-label').textContent=' · Copy instructions',2500);break;
+  case 'bridge':bridgePath=m.path;clearTimeout(copiedTimer);$('bridge-status').textContent=bridgePath?'Agent ready':'Agent offline';$('bridge-status').classList.toggle('connected',!!bridgePath);$('agent').textContent=bridgePath?'Disconnect agent':'Connect agent';$<HTMLButtonElement>('copy-agent').disabled=!bridgePath;$('copy-agent-label').hidden=!bridgePath;$('copy-agent').title=bridgePath?'Copy complete connection details and skill instructions for a new agent session':'Connect an agent to copy instructions';$('copy-agent').classList.toggle('connected',!!bridgePath);$('agent').classList.toggle('disconnect',!!bridgePath);$('follow-agent-control').hidden=!bridgePath;$('copy-review').hidden=!bridgePath;$('copy-agent-label').textContent=' · Copy instructions';break;
   case 'mode':input('mode').value=m.mode;modeChanged();break;
  }
 });

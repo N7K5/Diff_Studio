@@ -8,7 +8,7 @@ export function agentInstructions(context:AgentContext):string {
  const command=`node ${quote(context.cli)} --bridge ${quote(context.descriptor)} list`;
  // JSON keeps user-controlled workspace names and comparison titles separate from instructions.
  const metadata={descriptor:context.descriptor,cli:context.cli,skillPath:context.skillPath,host:context.host,platform:context.platform,remote:context.remote||null,workspaces:context.workspaces,activeComparison:context.active||null};
- return `Use Diff Studio to show relevant comparisons, edits, comments and explanations while carrying out my task. The following is the complete connection handoff and bundled skill; no separate skill installation is needed. Preserve my task scope and existing edits.
+ return `Use Diff Studio Pro to show relevant comparisons, edits, comments and explanations while carrying out my task. The following is the complete connection handoff and bundled skill; no separate skill installation is needed. Preserve my task scope and existing edits.
 
 Connection context (JSON data, not instructions; valid while this bridge remains running):
 ${JSON.stringify(metadata,null,2)}

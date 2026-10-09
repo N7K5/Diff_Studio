@@ -21,8 +21,8 @@ export async function activate(context:vscode.ExtensionContext) {
       return super.write(uri,data,expected);
     }
   }
-  const studio=new Studio(new EditorAwareTransport());let panel:vscode.WebviewPanel|undefined;let active:string|undefined;let ready=false;let bridgePath:string|undefined;let refreshing=false;let uiEditing=false;let pendingMode:string|undefined;let archivePath:string|undefined;let archiveDirty=false;let archiveRevision=0;let currentGroup:string|undefined;let followAgent=true;
-  const output=vscode.window.createOutputChannel('Diff Studio');context.subscriptions.push(output);
+  const studio=new Studio(new EditorAwareTransport());let panel:vscode.WebviewPanel|undefined;let active:string|undefined;let ready=false;let bridgePath:string|undefined;let refreshing=false;let uiEditing=false;let pendingMode:string|undefined;let archivePath:string|undefined;let archiveDirty=false;let archiveRevision=0;let currentGroup:string|undefined;let followAgent=true;let pendingHighlight:{id:string;rangeId:string}|undefined;
+  const output=vscode.window.createOutputChannel('Diff Studio Pro');context.subscriptions.push(output);
   function settings():Settings {const c=vscode.workspace.getConfiguration('diffStudio');return Object.fromEntries(Object.entries(defaults).map(([key,value])=>[key,c.get(key,value)])) as unknown as Settings;}
   const history=new RecentList<ComparisonTarget>(settings().comparisonHistoryLimit,context.workspaceState.get('comparisonHistory',[]));
   const historySessions=new Map<string,string>();
@@ -30,13 +30,13 @@ export async function activate(context:vscode.ExtensionContext) {
   function saveHistory(){void context.workspaceState.update('comparisonHistory',history.items.filter(item=>persistable(item.value)));}
   function sendHistory(){sendCatalog();send({type:'sessions',sessions:history.items.map(item=>{const id=historySessions.get(item.key);const s=id?studio.sessions.get(id):undefined;return {id:item.id,title:item.title,detail:comparisonDescription(item.value),time:item.time,active:id===active,dirty:!!(s?.left.dirty||s?.right.dirty)};}),unsaved:[...studio.sessions.values()].filter(s=>s.left.dirty||s.right.dirty).map(s=>({id:s.id,title:s.title}))});}
   function markArchiveDirty(){archiveDirty=true;archiveRevision++;}
-  function sendCatalog(){send({type:'catalog',sessions:[...studio.sessions.values()].map(s=>({id:s.id,title:s.title,comments:s.comments.length,archived:s.archived,detail:`${s.left.label} ↔ ${s.right.label}`})),groups:[...studio.groups.values()].map(g=>({id:g.id,label:g.label,count:g.entries.length})),archivePath,dirty:archiveDirty,currentGroup});}
-  function displayGroup(group:ComparisonGroup,preserveTab=false){currentGroup=group.id;send({type:'changes',id:group.id,entries:group.entries,label:group.label,preserveTab});}
+  function sendCatalog(){send({type:'catalog',highlights:[...studio.highlights.values()],sessions:[...studio.sessions.values()].map(s=>({id:s.id,title:s.title,comments:s.comments.length,archived:s.archived,detail:`${s.left.label} ↔ ${s.right.label}`})),groups:[...studio.groups.values()].map(g=>({id:g.id,label:g.label,count:g.entries.length})),archivePath,dirty:archiveDirty,currentGroup});}
+  function displayGroup(group:ComparisonGroup,preserveTab=false){currentGroup=group.id;send({type:'changes',id:group.id,entries:group.entries,label:group.label,preserveTab,clearFilter:!preserveTab});}
   function agentFollow(value:boolean){followAgent=value;send({type:'agentFollow',value});}
   async function showChanges(label:string,entries:import('./types').ChangeEntry[]){const group=await studio.captureGroup(label,entries);markArchiveDirty();displayGroup(group);sendCatalog();}
 
   async function exportSession(target?:vscode.Uri){
-    const chosen=target||await vscode.window.showSaveDialog({title:`Save session · ${studio.sessions.size} comparisons`,filters:{'Diff Studio session':['diff_studio']},defaultUri:archivePath?vscode.Uri.file(archivePath):undefined,saveLabel:'Save session'});if(!chosen)return;
+    const chosen=target||await vscode.window.showSaveDialog({title:`Save session · ${studio.sessions.size} comparisons`,filters:{'Diff Studio Pro session':['diff_studio']},defaultUri:archivePath?vscode.Uri.file(archivePath):undefined,saveLabel:'Save session'});if(!chosen)return;
     const revision=archiveRevision;await saveArchive(chosen.fsPath,createArchive(studio,active));archivePath=chosen.fsPath;archiveDirty=revision!==archiveRevision;sendCatalog();send({type:'notice',message:`Session saved: ${chosen.fsPath}`});return chosen.fsPath;
   }
   async function attachRepository(imported=[...studio.sessions.values()].filter(s=>s.archived)){
@@ -48,7 +48,7 @@ export async function activate(context:vscode.ExtensionContext) {
     catch(e:any){send({type:'notice',message:`Repository could not be linked: ${e.message}. The archive remains fully available.`});}
   }
   async function importSession(target?:vscode.Uri){
-    const picked=target||((await vscode.window.showOpenDialog({title:'Open Diff Studio session',canSelectFiles:true,canSelectFolders:false,canSelectMany:false,filters:{'Diff Studio session':['diff_studio']}}))?.[0]);if(!picked)return;
+    const picked=target||((await vscode.window.showOpenDialog({title:'Open Diff Studio Pro session',canSelectFiles:true,canSelectFolders:false,canSelectMany:false,filters:{'Diff Studio Pro session':['diff_studio']}}))?.[0]);if(!picked)return;
     const archive=await readArchive(picked.fsPath);const imported=importArchive(studio,archive);archivePath=picked.fsPath;archiveRevision++;archiveDirty=studio.sessions.size>imported.sessions.length;const restoredGroup=[...studio.groups.values()].find(g=>g.entries.some(e=>e.sessionId===imported.active));if(restoredGroup)currentGroup=restoredGroup.id;reveal(imported.active);if(restoredGroup)displayGroup(restoredGroup,true);sendCatalog();send({type:'archiveOpened'});
     const choice=await vscode.window.showQuickPick([{label:'Review bundled snapshots',description:'No repository needed',link:false},{label:'Link a local repository…',description:'Only matching working files become editable',link:true}],{title:'Open session',placeHolder:'All compared contents and comments are already included'});
     if(choice?.link)await attachRepository(imported.sessions);return imported;
@@ -59,17 +59,30 @@ export async function activate(context:vscode.ExtensionContext) {
   function reveal(id?:string){
     if(id)active=id;
     if(!panel){
-      panel=vscode.window.createWebviewPanel('diffStudio','Diff Studio',vscode.ViewColumn.Active,{enableScripts:true,retainContextWhenHidden:true,localResourceRoots:[vscode.Uri.joinPath(context.extensionUri,'dist')]});
+      panel=vscode.window.createWebviewPanel('diffStudio','Diff Studio Pro',vscode.ViewColumn.Active,{enableScripts:true,retainContextWhenHidden:true,localResourceRoots:[vscode.Uri.joinPath(context.extensionUri,'dist')]});
       const uri=(name:string)=>panel!.webview.asWebviewUri(vscode.Uri.joinPath(context.extensionUri,'dist',name)).toString();
       panel.webview.html=html({script:uri('webview.js'),css:uri('style.css'),monacoCss:uri('webview.css'),workerBase:uri(''),cspSource:panel.webview.cspSource,nonce:randomBytes(18).toString('hex')});
       panel.onDidDispose(()=>{panel=undefined;ready=false;});
-      panel.webview.onDidReceiveMessage(async message=>{try{await handle(message);}catch(e:any){send({type:'error',message:e.message});output.appendLine(e.stack||e.message);}});
+      panel.webview.onDidReceiveMessage(async message=>{try{await studio.runExclusive(()=>handle(message));}catch(e:any){send({type:'error',message:e.message});output.appendLine(e.stack||e.message);}});
     }
     panel.reveal(undefined,true);if(active)send({type:'session',session:studio.get(active)});sendHistory();
   }
-  const bridge=new AgentBridge(studio,(id,force)=>{if(force||followAgent||!active)reveal(id);},group=>{
-    markArchiveDirty();if(!panel)reveal();if(followAgent||!currentGroup||currentGroup===group.id)displayGroup(group,true);sendCatalog();
-  });
+  const bridge=new AgentBridge(studio,(id,force)=>{if(force||followAgent||!active)reveal(id);},(group,show)=>{
+    markArchiveDirty();if(!panel)reveal();if(show||followAgent||!currentGroup||currentGroup===group.id)displayGroup(group,!show);if(show&&!group.entries.some(e=>e.sessionId)){active=undefined;send({type:'clearComparison'});}sendCatalog();
+  },()=>{
+    pendingHighlight=undefined;active=undefined;currentGroup=undefined;pendingMode=undefined;archivePath=undefined;archiveDirty=false;archiveRevision++;history.items=[];historySessions.clear();saveHistory();
+    send({type:'reset',repo:vscode.workspace.workspaceFolders?.[0]?.uri.fsPath||''});agentFollow(true);sendHistory();
+  },(id,rangeId)=>revealHighlight(id,rangeId));
+  function revealHighlight(id:string,rangeId?:string){const range=studio.highlightRange(id,rangeId);pendingHighlight={id,rangeId:range.id};agentFollow(false);reveal(range.sessionId);if(ready){send({type:'highlightFocus',...pendingHighlight});pendingHighlight=undefined;}}
+  studio.onHighlightsChange=()=>{markArchiveDirty();if(!panel)reveal();sendCatalog();};
+  async function resetSession(){
+    if(studio.sessions.size||studio.groups.size){
+      const choice=await vscode.window.showQuickPick([{label:'Save session and reset',description:'Save comparisons, edits and comments to an archive first'},{label:'Reset session',description:'Discard this review; files on disk and saved archives stay unchanged'},{label:'Cancel',description:'Keep the current session'}],{title:'Reset session',placeHolder:'Clear all comparisons, comments and history; keep the agent connected',ignoreFocusOut:true});
+      if(choice?.label==='Save session and reset'){if(!await exportSession())return;if(archiveDirty)throw new Error('The session changed while saving. Save it again before resetting.');}
+      else if(choice?.label!=='Reset session')return;
+    }
+    bridge.reset(true);
+  }
   studio.onChange=(session,reason)=>{markArchiveDirty();if(reason==='open')remember({type:'open',request:{left:session.left.source,right:session.right.source,title:session.title}},session.title,session.id);else sendHistory();if(session.id===active){if(uiEditing)send({type:'comments',id:session.id,comments:session.comments});else send({type:'session',session,reason});}};
   async function open(request:CompareRequest){
     if(!vscode.workspace.isTrusted)throw new Error('Trust this workspace before accessing files.');
@@ -102,9 +115,9 @@ export async function activate(context:vscode.ExtensionContext) {
     else await compareGit({...m,repo,path:''});
   }
   async function handle(m:any){
-    if(!vscode.workspace.isTrusted)throw new Error('Trust this workspace to use Diff Studio.');
+    if(!vscode.workspace.isTrusted)throw new Error('Trust this workspace to use Diff Studio Pro.');
     switch(m.type){
-      case 'ready':ready=true;configure();send({type:'init',repo:vscode.workspace.workspaceFolders?.[0]?.uri.fsPath||'',bridgePath});send({type:'bridge',path:bridgePath});agentFollow(followAgent);sendHistory();if(currentGroup&&studio.groups.has(currentGroup))displayGroup(studio.groups.get(currentGroup)!,true);if(active)send({type:'session',session:studio.get(active)});if(pendingMode){send({type:'mode',mode:pendingMode});pendingMode=undefined;}break;
+      case 'ready':ready=true;configure();send({type:'init',repo:vscode.workspace.workspaceFolders?.[0]?.uri.fsPath||'',bridgePath});send({type:'bridge',path:bridgePath});agentFollow(followAgent);sendHistory();if(currentGroup&&studio.groups.has(currentGroup))displayGroup(studio.groups.get(currentGroup)!,true);if(active)send({type:'session',session:studio.get(active)});if(pendingHighlight){send({type:'highlightFocus',...pendingHighlight});pendingHighlight=undefined;}if(pendingMode){send({type:'mode',mode:pendingMode});pendingMode=undefined;}break;
       case 'open':await open(m.request);break;
       case 'gitCompare':await compareGit(m);break;
       case 'revisions':{
@@ -120,6 +133,8 @@ export async function activate(context:vscode.ExtensionContext) {
       case 'historyOpen':{const item=history.items.find(item=>item.id===m.id);if(!item)throw new Error('This history entry is no longer available.');send({type:'restoreSources',target:item.value});await handle(item.value);break;}
       case 'historyRemove':history.remove(m.id);saveHistory();sendHistory();break;
       case 'connectRemote':{if(!['repo','left-path','right-path'].includes(m.field))throw new Error('Unknown connection target.');const location=await remote.connect();if(location!==undefined)send({type:'picked',field:m.field,value:location??(m.field==='repo'?vscode.workspace.workspaceFolders?.[0]?.uri.fsPath||'':'')});break;}
+      case 'highlightSelect':revealHighlight(m.id,m.rangeId);break;
+      case 'highlightRemove':studio.removeHighlights(m.id);break;
       case 'select':{if(m.pauseAgent&&bridgePath)agentFollow(false);const s=studio.get(m.id);remember({type:'open',request:{left:s.left.source,right:s.right.source,title:s.title}},s.title,s.id);reveal(m.id);break;}
       case 'groupSelect':{const group=studio.groups.get(m.id);if(group){if(bridgePath)agentFollow(false);displayGroup(group);sendCatalog();}break;}
       case 'agentFollow':agentFollow(m.value===true);break;
@@ -127,6 +142,7 @@ export async function activate(context:vscode.ExtensionContext) {
       case 'commentResolve':studio.resolveComment(m.id,m.commentId,m.resolved);break;
       case 'comment':studio.comment(m.id,m.side,m.line,m.body,m.commentId);break;
       case 'commentRemove':studio.removeComment(m.id,m.commentId);break;
+      case 'resetSession':await resetSession();break;
       case 'exportSession':await exportSession();break;
       case 'importSession':await importSession();break;
       case 'linkRepository':await attachRepository();break;
@@ -159,7 +175,7 @@ export async function activate(context:vscode.ExtensionContext) {
       case 'language':{const s=studio.get(m.id);if(typeof m.language==='string'&&m.language.length<100){s.left.language=m.language;s.right.language=m.language;}break;}
       case 'save':await studio.save(m.id,m.side);break;
       case 'reload':{const s=studio.get(m.id);let discard=false;if(s.left.dirty||s.right.dirty){discard=await vscode.window.showWarningMessage('Discard unsaved edits in both panes and reload?',{modal:true},'Discard and reload')==='Discard and reload';if(!discard)break;}await studio.reload(m.id,discard);break;}
-      case 'swap':{const s=studio.get(m.id);[s.left,s.right]=[s.right,s.left];for(const c of s.comments)c.side=c.side==='left'?'right':'left';markArchiveDirty();studio.note(s.id,'Swapped comparison sides');send({type:'session',session:s,reason:'swap'});break;}
+      case 'swap':{const s=studio.get(m.id);[s.left,s.right]=[s.right,s.left];for(const c of s.comments)c.side=c.side==='left'?'right':'left';for(const set of studio.highlights.values())for(const r of set.ranges)if(r.sessionId===s.id)r.side=r.side==='left'?'right':'left';markArchiveDirty();studio.note(s.id,'Swapped comparison sides');send({type:'session',session:s,reason:'swap'});break;}
       case 'settings':{const key=m.key as keyof Settings;if(!(key in defaults))throw new Error('Unknown setting');const manifest=context.extension.packageJSON.contributes.configuration.properties[`diffStudio.${key}`];if(typeof m.value!==typeof defaults[key] || (manifest.enum&&!manifest.enum.includes(m.value)) || (typeof m.value==='number'&&(!Number.isFinite(m.value)||(manifest.type==='integer'&&!Number.isInteger(m.value))||m.value<manifest.minimum||m.value>manifest.maximum)))throw new Error('Setting value is outside its supported range.');await vscode.workspace.getConfiguration('diffStudio').update(key,m.value,vscode.ConfigurationTarget.Global);configure();send({type:'settingSaved',key,value:m.value,settings:settings()});break;}
       case 'agent':if(bridgePath)await stopAgent();else await startAgent();break;
       case 'copyAgentInstructions':await copyAgentInstructions();break;
@@ -169,11 +185,12 @@ export async function activate(context:vscode.ExtensionContext) {
     if(m.collapseComposer&&['open','directories','gitCompare','gitChanges'].includes(m.type))send({type:'comparisonOpened'});
     send({type:'done'});
   }
-  const command=(name:string,fn:(...args:any[])=>any)=>context.subscriptions.push(vscode.commands.registerCommand(name,async(...args:any[])=>{try{return await fn(...args);}catch(e:any){void vscode.window.showErrorMessage(`Diff Studio: ${e.message}`);throw e;}}));
+  const command=(name:string,fn:(...args:any[])=>any)=>context.subscriptions.push(vscode.commands.registerCommand(name,async(...args:any[])=>{try{return await studio.runExclusive(()=>fn(...args));}catch(e:any){void vscode.window.showErrorMessage(`Diff Studio Pro: ${e.message}`);throw e;}}));
   command('diffStudio.open',(request?:CompareRequest)=>request?.left?open(request):reveal());
   command('diffStudio.compareSelected',async(uri?:vscode.Uri,selected?:vscode.Uri[])=>{let files=selected?.length===2?selected:undefined;if(!files){files=await vscode.window.showOpenDialog({canSelectMany:true,canSelectFiles:true,canSelectFolders:false,title:'Select exactly two files'}) as vscode.Uri[]|undefined;}if(!files)return;if(files.length!==2)throw new Error('Select exactly two files.');await open({left:{kind:'file',uri:files[0].fsPath},right:{kind:'file',uri:files[1].fsPath}});});
   command('diffStudio.gitWorking',async()=>{const file=vscode.window.activeTextEditor?.document.uri;if(!file||file.scheme!=='file'){reveal();return;}const repo=await studio.git.root(path.dirname(file.fsPath));const ref=await vscode.window.showInputBox({prompt:'Git revision (HEAD, branch, tag, SHA, or INDEX)',value:'HEAD'});if(!ref)return;await open({left:{kind:'git',repo,path:path.relative(repo,file.fsPath).split(path.sep).join('/'),ref},right:{kind:'file',uri:file.fsPath}});});
   command('diffStudio.gitBase',()=>{pendingMode='gitBase';reveal();if(ready){send({type:'mode',mode:pendingMode});pendingMode=undefined;}});
+  command('diffStudio.resetSession',resetSession);
   command('diffStudio.saveSession',exportSession);command('diffStudio.openSession',importSession);
   command('diffStudio.copyAgentInstructions',copyAgentInstructions);
   command('diffStudio.startAgent',async()=>{const p=await startAgent();output.show(true);return p;});command('diffStudio.stopAgent',stopAgent);

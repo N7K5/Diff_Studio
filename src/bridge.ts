@@ -12,7 +12,8 @@ export class AgentBridge {
   private descriptor?:string;
   private token=randomBytes(32).toString('hex');
   private review:AgentReview;
-  constructor(private studio:Studio, private reveal:(id:string,force?:boolean)=>void = ()=>{},changed:(group:ComparisonGroup)=>void=()=>{}) {this.review=new AgentReview(studio,changed);}
+  constructor(private studio:Studio, private reveal:(id:string,force?:boolean)=>void = ()=>{},changed:(group:ComparisonGroup,show?:boolean)=>void=()=>{},private onReset:()=>void=()=>{},private focusHighlight:(id:string,rangeId:string)=>void=()=>{}) {this.review=new AgentReview(studio,changed);}
+  reset(discard=false){const result=this.studio.reset(discard);this.review.clear();this.onReset();return {ok:true,...result};}
   async start(directory:string):Promise<string> {
     if(this.descriptor)return this.descriptor;
     await fs.mkdir(directory,{recursive:true,mode:0o700});
@@ -33,15 +34,21 @@ export class AgentBridge {
     try{
       const url=new URL(req.url||'/','http://127.0.0.1');
       if(req.method==='GET'&&url.pathname==='/sessions'){reply(200,[...this.studio.sessions.values()].map(s=>this.view(s.id)));return;}
+      if(req.method==='GET'&&url.pathname==='/highlights'){reply(200,[...this.studio.highlights.values()]);return;}
       if(req.method==='GET'&&url.pathname==='/groups'){reply(200,[...this.studio.groups.values()]);return;}
       if(req.method==='GET'&&url.pathname==='/comments'){const id=url.searchParams.get('session');const sessions=id?[this.studio.get(id)]:[...this.studio.sessions.values()];reply(200,sessions.flatMap(s=>s.comments.map(comment=>({sessionId:s.id,title:s.title,left:s.left.label,right:s.right.label,...comment}))));return;}
       if(req.method!=='POST'){reply(404,{error:'Not found'});return;}
       let bytes=0;const chunks:Buffer[]=[];for await(const chunk of req){bytes+=chunk.length;if(bytes>this.studio.io.maxBytes*2+65536)throw new Error('Request too large');chunks.push(chunk);}
-      const body=JSON.parse(Buffer.concat(chunks).toString());let result:unknown;
+      const body=JSON.parse(Buffer.concat(chunks).toString());const result=await this.studio.runExclusive(async()=>{let result:unknown;
       switch(url.pathname){
-        case '/open': {const s=await this.review.open(body);this.reveal(s.id);result=this.view(s.id);break;}
-        case '/project':{const group=await this.review.project(body.repo,body.leftRef,body.rightRef);const first=group.entries.find(e=>e.sessionId);if(first)this.reveal(first.sessionId!);result=group;break;}
-        case '/folders':{const group=await this.review.folders(body.left,body.right);const first=group.entries.find(e=>e.sessionId);if(first)this.reveal(first.sessionId!);result=group;break;}
+        case '/highlights':{const set=this.studio.setHighlights(body);if(body.reveal===true)this.focusHighlight(set.id,set.ranges[0].id);result=set;break;}
+        case '/highlight-remove':this.studio.removeHighlights(body.id);result={ok:true};break;
+        case '/highlight-reveal':{const range=this.studio.highlightRange(body.id,body.rangeId);this.focusHighlight(body.id,range.id);result={ok:true};break;}
+        case '/reset':result=this.reset(body.discard===true);break;
+        case '/open': {const s=await this.review.open(body,body.replace===true);this.reveal(s.id,body.replace===true);result=this.view(s.id);break;}
+        case '/project':{const group=await this.review.project(body.repo,body.leftRef,body.rightRef,body.replace===true);const first=group.entries.find(e=>e.sessionId);if(first)this.reveal(first.sessionId!,body.replace===true);result=group;break;}
+        case '/folders':{const group=await this.review.folders(body.left,body.right,body.replace===true);const first=group.entries.find(e=>e.sessionId);if(first)this.reveal(first.sessionId!,body.replace===true);result=group;break;}
+        case '/changes':{const group=await this.review.changes(body.label,body.comparisons,body.replace===true);const first=group.entries.find(e=>e.sessionId);if(first)this.reveal(first.sessionId!,body.replace===true);result=group;break;}
         case '/reply':this.studio.reply(body.id,body.commentId,body.body,'agent');result=this.view(body.id);break;
         case '/resolve':this.studio.resolveComment(body.id,body.commentId,body.resolved);result=this.view(body.id);break;
         case '/note':this.studio.note(body.id,body.message);this.reveal(body.id);result={ok:true};break;
@@ -55,10 +62,11 @@ export class AgentBridge {
         case '/save':await this.studio.save(body.id,body.side);result=this.view(body.id);break;
         case '/reload':await this.studio.reload(body.id,body.discard===true);result=this.view(body.id);break;
         case '/reveal':this.studio.get(body.id);this.reveal(body.id,true);result={ok:true};break;
-        default:reply(404,{error:'Not found'});return;
+        default:throw Object.assign(new Error('Not found'),{statusCode:404});
       }
+      return result;});
       reply(200,result);
-    }catch(e:any){reply(400,{error:e.message});}
+    }catch(e:any){reply(e.statusCode===404?404:400,{error:e.message});}
   }
   private view(id:string){const s=this.studio.get(id);return {...s,left:{...s.left,hash:hash(s.left.text)},right:{...s.right,hash:hash(s.right.text)}};}
 }

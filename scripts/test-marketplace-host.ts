@@ -26,7 +26,7 @@ export async function run(){
  const before=path.join(demo,'before'),after=path.join(demo,'after');await fs.mkdir(before);
  for(const file of git('ls-tree','-r','--name-only','main').split('\n')){await fs.mkdir(path.dirname(path.join(before,file)),{recursive:true});await fs.writeFile(path.join(before,file),git('show',`main:${file}`)+'\n');}
  await fs.cp(repo,after,{recursive:true,filter:source=>path.basename(source)!=='.git'});
- const extension=vscode.extensions.getExtension('N7K5.diff-studio');if(!extension)throw new Error('Extension missing');
+ const extension=vscode.extensions.getExtension('KUNU.diff-studio-pro');if(!extension)throw new Error('Extension missing');
  const api=await extension.activate();await api.reveal();
  const descriptor=await api.startAgent();
  const auth=JSON.parse(await fs.readFile(descriptor,'utf8'));

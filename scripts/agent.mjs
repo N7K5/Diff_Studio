@@ -2,10 +2,20 @@
 import {readFile} from 'node:fs/promises';
 const args=process.argv.slice(2);const bridgeIndex=args.indexOf('--bridge');
 const descriptor=bridgeIndex>=0?args.splice(bridgeIndex,2)[1]:process.env.DIFF_STUDIO_BRIDGE;
+const replace=args.includes('--replace');if(replace)args.splice(args.indexOf('--replace'),1);
+const discard=args.includes('--discard');if(discard)args.splice(args.indexOf('--discard'),1);
+const reveal=args.includes('--reveal');if(reveal)args.splice(args.indexOf('--reveal'),1);
 const [command,...rest]=args;
-const usage=`Diff Studio agent CLI (Node 18+)
+const usage=`Diff Studio Pro agent CLI (Node 18+)
   --bridge PATH (or DIFF_STUDIO_BRIDGE) points to the descriptor shown by Start Agent Bridge.
+  reset [--discard]                       Clear the review; keep this connection (discard requires user authorization)
+  changes JSON_FILE [--replace]           Publish {label, comparisons:[{path,left,right}]}
+  --replace                              Replace and show Agent files for open/git/revisions/request/project/folders/changes
   list
+  highlights                              List named colored line-range groups
+  highlight JSON_FILE [--reveal]           Create/update {id?,label,color,ranges:[{sessionId,side,startLine,endLine,label?,color?,comment?}]}
+  highlight-reveal GROUP [RANGE]           Jump to a highlighted range
+  highlight-remove GROUP                  Remove highlights; keep comment threads
   groups                                  List all saved file trees
   project REPO [BASE=HEAD] [TARGET=WORKING] Show a full Git changed-file tree
   folders LEFT RIGHT                      Show a folder comparison tree
@@ -33,16 +43,22 @@ try {
  const endpoint=new URL(url);if(endpoint.hostname!=='127.0.0.1'||endpoint.protocol!=='http:')throw new Error('Invalid bridge URL.');
  const request=async(route,body)=>{const r=await fetch(url+route,{method:body?'POST':'GET',headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},body:body?JSON.stringify(body):undefined});const result=await r.json();if(!r.ok)throw new Error(result.error||r.statusText);return result;};
  const file=uri=>({kind:'file',uri});let result;
- if(command==='list')result=await request('/sessions');
+ if(command==='reset')result=await request('/reset',{discard});
+ else if(command==='changes')result=await request('/changes',{...JSON.parse(await readFile(rest[0],'utf8')),replace});
+ else if(command==='list')result=await request('/sessions');
+ else if(command==='highlights')result=await request('/highlights');
+ else if(command==='highlight')result=await request('/highlights',{...JSON.parse(await readFile(rest[0],'utf8')),reveal});
+ else if(command==='highlight-reveal')result=await request('/highlight-reveal',{id:rest[0],rangeId:rest[1]});
+ else if(command==='highlight-remove')result=await request('/highlight-remove',{id:rest[0]});
  else if(command==='groups')result=await request('/groups');
- else if(command==='project')result=await request('/project',{repo:rest[0],leftRef:rest[1]||'HEAD',rightRef:rest[2]||'WORKING'});
- else if(command==='folders')result=await request('/folders',{left:rest[0],right:rest[1]});
+ else if(command==='project')result=await request('/project',{repo:rest[0],leftRef:rest[1]||'HEAD',rightRef:rest[2]||'WORKING',replace});
+ else if(command==='folders')result=await request('/folders',{left:rest[0],right:rest[1],replace});
  else if(command==='comments')result=await request('/comments'+(rest[0]?'?session='+encodeURIComponent(rest[0]):''));
  else if(command==='reply')result=await request('/reply',{id:rest[0],commentId:rest[1],body:rest.slice(2).join(' ')});
  else if(command==='resolve'||command==='reopen')result=await request('/resolve',{id:rest[0],commentId:rest[1],resolved:command==='resolve'});
- else if(command==='open')result=await request('/open',{left:file(rest[0]),right:file(rest[1])});
- else if(command==='git'||command==='revisions'){const [repo,path,ref,rightRef]=rest;result=await request('/open',{left:{kind:'git',repo,path,ref},right:command==='git'?{...file(repo.replace(/\/$/,'')+'/'+path),allowMissing:true}:{kind:'git',repo,path,ref:rightRef}});}
- else if(command==='request')result=await request('/open',JSON.parse(await readFile(rest[0],'utf8')));
+ else if(command==='open')result=await request('/open',{left:file(rest[0]),right:file(rest[1]),replace});
+ else if(command==='git'||command==='revisions'){const [repo,path,ref,rightRef]=rest;result=await request('/open',{replace,left:{kind:'git',repo,path,ref},right:command==='git'?{...file(repo.replace(/\/$/,'')+'/'+path),allowMissing:true}:{kind:'git',repo,path,ref:rightRef}});}
+ else if(command==='request')result=await request('/open',{...JSON.parse(await readFile(rest[0],'utf8')),replace});
  else if(command==='note')result=await request('/note',{id:rest[0],message:rest.slice(1).join(' ')});
  else if(command==='comment')result=await request('/comment',{id:rest[0],side:rest[1],line:Number(rest[2]),body:rest.slice(3).join(' ')});
  else if(command==='comment-remove')result=await request('/comment-remove',{id:rest[0],commentId:rest[1]});

@@ -40,6 +40,7 @@ export class Sidebar {
   });
   new ResizeObserver(()=>this.update()).observe(rail.parentElement!);
  }
+ reveal(target:HTMLElement){this.keyboard=true;this.rail.classList.add('keyboard-focus');target.focus();this.focusChanged();}
  private focusChanged(){this.rail.classList.toggle('keyboard-focus',this.keyboard&&this.rail.contains(document.activeElement));}
  private maximum(){return Math.max(160,Math.min(800,this.rail.parentElement!.clientWidth-160));}
  private width(value:number){return Math.round(Math.max(160,Math.min(this.maximum(),value)));}

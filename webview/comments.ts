@@ -6,7 +6,7 @@ export class CommentUI {
   private draft?:{side:Side;line:number;body:string;commentId?:string;replyTo?:string};
   private zones=new Map<Editor,string[]>();
   private signature='';
-  constructor(private editors:{editor:Editor;side:()=>Side;visible:()=>boolean;includeLeft?:()=>boolean;mapLine?:(side:Side,line:number)=>number}[],private session:()=>Session|undefined,private send:(message:object)=>void){
+  constructor(private editors:{editor:Editor;side:()=>Side;visible:()=>boolean;includeLeft?:()=>boolean;mapLine?:(side:Side,line:number)=>number}[],private session:()=>Session|undefined,private send:(message:object)=>void,private highlight:(side:Side,line:number,id:string)=>{color:string;label:string}|undefined=()=>undefined){
     for(const {editor,side} of editors){
       editor.updateOptions({glyphMargin:true});
       const hover=editor.createDecorationsCollection();
@@ -20,6 +20,7 @@ export class CommentUI {
     if(!this.session())return;this.draft={side,line,body:comment?.body||'',commentId:comment?.id};this.render(true);for(const e of this.editors)if(e.visible()&&e.side()===side)e.editor.revealLineInCenter(line);
     requestAnimationFrame(()=>document.querySelector<HTMLTextAreaElement>('.comment-composer textarea')?.focus());
   }
+  clear(){this.draft=undefined;this.signature='';for(const {editor} of this.editors)editor.changeViewZones(accessor=>{for(const id of this.zones.get(editor)||[])accessor.removeZone(id);});this.zones.clear();}
   render(force=false){
     const session=this.session();if(!session)return;
     if(this.signature&&!this.signature.startsWith(session.id+'|'))this.draft=undefined;
@@ -36,7 +37,8 @@ export class CommentUI {
           const container=document.createElement('div');container.className=`line-comments comments-${selectedSide}`;container.dataset.side=selectedSide;container.dataset.line=String(line);container.setAttribute('aria-label',`${selectedSide} line ${line} comments`);
           for(const comment of comments.filter(c=>c.line===line)){
             const card=document.createElement('article');card.className='line-comment'+(comment.resolved?' resolved':'');card.dataset.commentId=comment.id;
-            const header=document.createElement('div');header.className='comment-header';const label=document.createElement('strong');label.textContent=`${selectedSide==='left'?'Left':'Right'} · line ${line}${comment.outdated?' · original line changed':''}${comment.resolved?' · Resolved':''}${comment.author==='agent'?' · Agent':''}`;
+            const highlight=this.highlight(selectedSide,line,comment.id);if(highlight){card.style.borderLeft=`4px solid ${highlight.color}`;card.style.backgroundColor=`${highlight.color}18`;card.dataset.highlightColor=highlight.color;}
+            const header=document.createElement('div');header.className='comment-header';const label=document.createElement('strong');label.textContent=`${selectedSide==='left'?'Left':'Right'} · line ${line}${comment.outdated?' · original line changed':''}${comment.resolved?' · Resolved':''}${comment.author==='agent'?' · Agent':''}${highlight?' · '+highlight.label:''}`;
             const edit=document.createElement('button');edit.textContent='Edit';edit.onclick=()=>this.start(selectedSide,line,comment);const remove=document.createElement('button');remove.textContent='×';remove.setAttribute('aria-label','Delete comment');remove.onclick=()=>this.send({type:'commentRemove',id:session.id,commentId:comment.id});const reply=document.createElement('button');reply.textContent='Reply';reply.onclick=()=>{this.draft={side:selectedSide,line,body:'',replyTo:comment.id};this.render(true);requestAnimationFrame(()=>document.querySelector<HTMLTextAreaElement>('.comment-input')?.focus());};
             const resolve=document.createElement('button');resolve.textContent=comment.resolved?'Reopen':'Resolve';resolve.onclick=()=>this.send({type:'commentResolve',id:session.id,commentId:comment.id,resolved:!comment.resolved});header.append(label,reply,resolve,edit,remove);
             const body=document.createElement('div');body.className='comment-body';body.textContent=comment.body;card.append(header,body);for(const reply of comment.replies||[]){const row=document.createElement('div');row.className='comment-reply';const author=document.createElement('strong');author.textContent=reply.author==='agent'?'Agent':'You';const text=document.createElement('span');text.textContent=reply.body;row.append(author,text);card.append(row);}
