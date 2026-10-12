@@ -5,6 +5,7 @@ import {CommentUI} from './comments';
 import {Sidebar} from './sidebar';
 import {installTooltips} from './tooltips';
 import {HighlightUI} from './highlights';
+import {DiffSplit} from './diffSplit';
 import {changeTree, ChangeNode} from '../src/tree';
 import type {ComparisonTarget} from '../src/recent';
 declare function acquireVsCodeApi(): {postMessage(message:unknown):void; getState():any; setState(state:any):void};
@@ -48,8 +49,9 @@ const workerUrls=new Map<string,string>();
 }};
 function theme(){const light=document.body.classList.contains('vscode-light');const high=document.body.classList.contains('vscode-high-contrast');monaco.editor.setTheme(high?'hc-black':light?'vs':'vs-dark');}
 theme();new MutationObserver(theme).observe(document.body,{attributes:true,attributeFilter:['class']});
-const editor=monaco.editor.createDiffEditor($('diff-editor'),{automaticLayout:true,originalEditable:true,readOnly:false,renderSideBySide:true,useInlineViewWhenSpaceIsLimited:false,enableSplitViewResizing:true,minimap:{enabled:false},scrollBeyondLastLine:false,fontSize:13,ignoreTrimWhitespace:false,renderMarginRevertIcon:true,accessibilityVerbose:true});
+const editor=monaco.editor.createDiffEditor($('diff-editor'),{automaticLayout:true,originalEditable:true,readOnly:false,renderSideBySide:true,useInlineViewWhenSpaceIsLimited:false,enableSplitViewResizing:false,minimap:{enabled:false},scrollBeyondLastLine:false,fontSize:13,ignoreTrimWhitespace:false,renderMarginRevertIcon:true,accessibilityVerbose:true});
 const focusEditor=monaco.editor.create($('focus-editor'),{automaticLayout:true,minimap:{enabled:false},scrollBeyondLastLine:false});
+const diffSplit=new DiffSplit(editor,$('editor-wrap'),$('diff-divider'),$<HTMLButtonElement>('shrink-left'),$<HTMLButtonElement>('shrink-right'),document.querySelector<HTMLElement>('.file-heads')!);
 const highlightUI=new HighlightUI(()=>session,()=>models,send);
 const commentUI=new CommentUI([{editor:editor.getOriginalEditor(),side:()=> 'left',visible:()=>!$('diff-editor').hidden&&value('layout')!=='inline'},{editor:editor.getModifiedEditor(),side:()=> 'right',visible:()=>!$('diff-editor').hidden,includeLeft:()=>value('layout')==='inline',mapLine:(side,line)=>{if(side==='right'||value('layout')!=='inline')return line;let delta=0;for(const change of editor.getLineChanges()||[]){if(line<change.originalStartLineNumber)break;if(change.originalEndLineNumber&&line<=change.originalEndLineNumber)return change.modifiedEndLineNumber?change.modifiedStartLineNumber+Math.min(line-change.originalStartLineNumber,change.modifiedEndLineNumber-change.modifiedStartLineNumber):change.modifiedStartLineNumber;const oldLength=change.originalEndLineNumber?change.originalEndLineNumber-change.originalStartLineNumber+1:0;const newLength=change.modifiedEndLineNumber?change.modifiedEndLineNumber-change.modifiedStartLineNumber+1:0;delta+=newLength-oldLength;}return line+delta;}},{editor:focusEditor,side:()=>value('layout')==='left'?'left':'right',visible:()=>!$('focus-editor').hidden}],()=>session,send,(side,line,id)=>highlightUI.commentStyle(side,line,id));
 for(const l of monaco.languages.getLanguages().sort((a,b)=>a.id.localeCompare(b.id))){const option=document.createElement('option');option.value=l.id;option.textContent=l.aliases?.[0]||l.id;$('language').append(option);}
@@ -77,7 +79,7 @@ function applyLayout(){
  $('left-head').hidden=layout==='right';$('right-head').hidden=layout==='left';
  if(single&&session&&models){focused=layout;focusEditor.setModel(layout==='left'?models.original:models.modified);focusEditor.updateOptions({readOnly:!session[layout].writable});focusEditor.layout();}
  else {editor.updateOptions({renderSideBySide:layout!=='inline'});editor.layout();}
- commentUI.render();highlightUI.render();
+ diffSplit.update(layout);commentUI.render();highlightUI.render();
 }
 function metadata(){
  if(!session||!models)return;
@@ -239,7 +241,7 @@ window.addEventListener('message',event=>{
  switch(m.type){
   case 'clearComparison':clearComparison();break;
   case 'reset':{
-   closeSessionMenu();clearComparison();changes=[];input('filter').value='';collapsedFolders.clear();$('file-count').textContent='0';renderChanges();renderHistory([],[]);sidebarTab('files');
+   diffSplit.reset();closeSessionMenu();clearComparison();changes=[];input('filter').value='';collapsedFolders.clear();$('file-count').textContent='0';renderChanges();renderHistory([],[]);sidebarTab('files');
    clearTimeout(revisionTimer);revisionRequest++;revisionRefs=[];revisionCommits=[];nextRevisionOffset=0;
    input('mode').value='files';for(const id of ['left-path','right-path','git-file'])input(id).value='';input('repo').value=m.repo||'';input('left-ref').value='HEAD';input('right-ref').value='HEAD';input('git-mode').value='working';input('revision-order').value='newest';input('merge-base').checked=false;
    input('layout').value=config.layout;focused='right';composerCollapsed=false;$('settings').hidden=true;api.setState(undefined);modeChanged();applyPanelVisibility();showMessage('Session reset. Ready for new comparisons.');$<HTMLButtonElement>('compare').disabled=false;break;

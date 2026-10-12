@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.2.2
+
+- Remove the Compare Current File with Git Revision shortcut from the editor title toolbar.
+
+## 1.2.1
+
+- Add center-divider arrows to shrink either diff pane and restore the previous split.
+- Add a draggable, keyboard-accessible divider with aligned file headers and double-click centering.
+
 ## 1.2.0
 
 - Add named agent highlight groups spanning line ranges across files, with custom colors, inline discussion threads, and a separate Files section.

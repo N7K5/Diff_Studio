@@ -277,3 +277,5 @@ The agent uses `groups` or `list` to obtain comparison IDs, then `highlight high
 ```
 
 Ranges use inclusive line numbers from the chosen side. Each range can override the group color. `highlight-reveal GROUP_ID RANGE_ID` jumps directly to a range; `highlight-remove GROUP_ID` removes its highlights while preserving comments. Save session includes the groups, colors, ranges and discussion threads for offline review. Edits through a range mark it **Changed since highlight** so the agent can review and update it.
+
+In side-by-side mode, use the center **‹ / ›** controls to shrink either pane to a narrow strip. Click the same control again to restore your previous split. Drag the divider to resize manually, or double-click it to return to 50/50. The divider also supports arrow keys, Home/End, and Enter to center.

@@ -2,7 +2,7 @@
   "name": "diff-studio-pro",
   "displayName": "Diff Studio Pro",
   "description": "Built for coding agents: review project diffs, edit side by side, discuss changes with line comments, and share portable review sessions.",
-  "version": "1.2.0",
+  "version": "1.2.2",
   "type": "module",
   "publisher": "KUNU",
   "icon": "assets/marketplace-logo.png",
@@ -84,13 +84,6 @@
           "command": "diffStudio.openSession",
           "group": "navigation",
           "when": "resourceExtname == .diff_studio"
-        }
-      ],
-      "editor/title": [
-        {
-          "command": "diffStudio.gitWorking",
-          "group": "navigation",
-          "when": "resourceScheme == file"
         }
       ]
     },
